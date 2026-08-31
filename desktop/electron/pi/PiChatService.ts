@@ -53,7 +53,7 @@ import { resolveModelScopeFromContextType, resolveScopedModelName } from '../cor
 import { normalizeApiBaseUrl, safeUrlJoin } from '../core/urlUtils';
 import { logDebugEvent } from '../core/debugLogger';
 import { loadPrompt, renderPrompt } from '../prompts/runtime';
-import { getAgentRuntime, getTaskGraphRuntime, type PreparedRuntimeExecution, type RuntimeMode } from '../core/ai';
+import { getAgentRuntime, getTaskGraphRuntime, type PreparedRuntimeExecution, type RuntimeMode, type ThinkingBudget } from '../core/ai';
 import type { RuntimeEvent, RuntimeMessageContentPart } from '../core/runtimeTypes';
 import { getSessionRuntimeStore } from '../core/sessionRuntimeStore';
 
@@ -188,6 +188,7 @@ interface ChatModelOverrideConfig {
   apiKey?: string;
   baseURL?: string;
   modelName?: string;
+  reasoningEffort?: ThinkingBudget;
 }
 
 interface ChatAttachmentRuntimeOptions {
@@ -720,6 +721,7 @@ export class PiChatService {
       route: preparedExecution.route.intent,
       role: preparedExecution.role.roleId,
       thinkingBudget: preparedExecution.thinkingBudget,
+      requestedThinkingBudget: modelOverride?.reasoningEffort || null,
     });
     this.emitDebugLog('info', 'sendMessage:prepared', {
       modelName,
@@ -774,9 +776,9 @@ export class PiChatService {
           maxTurns,
           maxTimeMinutes,
           temperature,
-          reasoningEffort: modelName.toLowerCase().includes('grok')
-            ? preparedExecution.thinkingBudget
-            : undefined,
+          reasoningEffort: modelOverride?.reasoningEffort || (
+            modelName.toLowerCase().includes('grok') ? preparedExecution.thinkingBudget : undefined
+          ),
           toolPack: 'redclaw',
           toolNames: preparedExecution.route.intent === 'direct_answer' ? [] : undefined,
           runtimeMode,
@@ -998,6 +1000,7 @@ export class PiChatService {
     const preparedExecution = await agentRuntime.prepareExecution({
       runtimeContext,
       baseSystemPrompt,
+      thinkingBudget: modelOverride?.reasoningEffort,
       llm: {
         apiKey,
         baseURL,

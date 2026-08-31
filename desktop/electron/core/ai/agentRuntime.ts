@@ -248,6 +248,7 @@ export class AgentRuntime {
   async prepareExecution(params: {
     runtimeContext: RuntimeContext;
     baseSystemPrompt: string;
+    thinkingBudget?: ThinkingBudget;
     llm?: {
       apiKey: string;
       baseURL: string;
@@ -256,7 +257,8 @@ export class AgentRuntime {
     };
   }): Promise<PreparedRuntimeExecution> {
     const analysis = this.analyzeRuntimeContext({ runtimeContext: params.runtimeContext });
-    const { route, role, thinkingBudget, orchestrationEnabled } = analysis;
+    const { route, role, orchestrationEnabled } = analysis;
+    const thinkingBudget = params.thinkingBudget || analysis.thinkingBudget;
     const hints = extractHints(params.runtimeContext);
     const runtime = getTaskGraphRuntime();
     const task = runtime.createInteractiveTask({

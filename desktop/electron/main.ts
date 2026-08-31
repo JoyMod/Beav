@@ -6952,7 +6952,7 @@ ipcMain.on('chat:send-message', async (event, {
   const sender = event.sender;
   const settings = (getSettings() || {}) as Record<string, unknown>;
   const selectedModelConfig = (modelConfig && typeof modelConfig === 'object')
-    ? modelConfig as { apiKey?: string; baseURL?: string; modelName?: string }
+    ? modelConfig as { apiKey?: string; baseURL?: string; modelName?: string; reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' }
     : null;
   const resolvedChatApiKey = String(selectedModelConfig?.apiKey || settings.api_key || '').trim();
   const resolvedChatBaseURL = normalizeApiBaseUrl(String(selectedModelConfig?.baseURL || settings.api_endpoint || '').trim());
@@ -7094,6 +7094,7 @@ ipcMain.on('chat:send-message', async (event, {
           },
         },
         baseSystemPrompt,
+        thinkingBudget: selectedModelConfig?.reasoningEffort,
         llm: {
           apiKey: resolvedChatApiKey,
           baseURL: resolvedChatBaseURL,
@@ -7121,6 +7122,7 @@ ipcMain.on('chat:send-message', async (event, {
         apiKey: resolvedChatApiKey,
         baseURL: resolvedChatBaseURL,
         modelName: resolvedModelName,
+        reasoningEffort: selectedModelConfig?.reasoningEffort,
       },
       {
         userInputContent: attachmentRuntimeInput || undefined,

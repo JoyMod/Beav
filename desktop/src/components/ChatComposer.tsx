@@ -89,6 +89,85 @@ export interface ChatModelOption {
   isDefault?: boolean;
 }
 
+export type ChatReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
+
+const CHAT_REASONING_OPTIONS: Array<{
+  value: ChatReasoningEffort;
+  label: string;
+  description: string;
+}> = [
+  { value: 'minimal', label: '极简', description: '最快，适合简单问答' },
+  { value: 'low', label: '快速', description: '日常对话，速度优先' },
+  { value: 'medium', label: '标准', description: '质量与速度平衡' },
+  { value: 'high', label: '深度', description: '复杂任务，思考更充分' },
+];
+
+export function getChatModelDisplayName(modelName: string): string {
+  const raw = String(modelName || '').trim();
+  if (!raw) return '默认模型';
+  const withoutRelease = raw.replace(/-(?:ga-)?\d{6,8}$/i, '');
+  const formatTail = (tail: string) => tail
+    .replace(/seed-(\d+)-(\d+)/i, 'Seed $1.$2')
+    .replace(/[-_]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => {
+      if (/^v\d/i.test(token)) return token.toUpperCase();
+      if (/^\d+k$/i.test(token)) return token.toUpperCase();
+      if (/^(pro|flash|turbo|lite|max|mini|reasoner|sonnet|opus|haiku)$/i.test(token)) {
+        return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+      }
+      return token;
+    })
+    .join(' ');
+  const knownBrands: Array<[RegExp, string]> = [
+    [/^deepseek[-_]?/i, 'DeepSeek'],
+    [/^doubao[-_]?/i, '豆包'],
+    [/^grok[-_]?/i, 'Grok'],
+    [/^claude[-_]?/i, 'Claude'],
+    [/^gemini[-_]?/i, 'Gemini'],
+    [/^qwen[-_]?/i, 'Qwen'],
+  ];
+  for (const [pattern, brand] of knownBrands) {
+    if (pattern.test(withoutRelease)) {
+      return `${brand} ${formatTail(withoutRelease.replace(pattern, ''))}`.trim();
+    }
+  }
+  if (/^gpt[-_]?/i.test(withoutRelease)) {
+    return `GPT-${withoutRelease.replace(/^gpt[-_]?/i, '')}`;
+  }
+  return formatTail(withoutRelease);
+}
+
+function getChatModelLogo(option?: ChatModelOption | null): string {
+  if (!option) return '';
+  const model = option.modelName.toLowerCase();
+  const provider = `${option.presetId || ''} ${option.sourceId || ''} ${option.sourceName || ''}`.toLowerCase();
+  if (model.includes('deepseek')) return '/provider-logos/deepseek.svg';
+  if (model.includes('grok') || provider.includes('xai')) return '/provider-logos/xai.svg';
+  if (model.includes('doubao') || model.includes('seedance') || model.includes('seedream') || provider.includes('ark') || provider.includes('火山')) return '/provider-logos/volcengine.svg';
+  if (model.includes('claude') || provider.includes('anthropic')) return '/provider-logos/anthropic.svg';
+  if (model.includes('gemini') || provider.includes('gemini')) return '/provider-logos/gemini.svg';
+  if (model.includes('qwen') || provider.includes('dashscope') || provider.includes('通义')) return '/provider-logos/qwen.svg';
+  if (model.includes('kimi') || provider.includes('moonshot')) return '/provider-logos/kimi.svg';
+  if (model.includes('glm') || provider.includes('zhipu') || provider.includes('智谱')) return '/provider-logos/zhipu.svg';
+  if (model.includes('gpt') || model.includes('openai') || provider.includes('openai')) return '/provider-logos/openai.svg';
+  return '';
+}
+
+function ChatModelLogo({ option, className }: { option?: ChatModelOption | null; className: string }) {
+  const logo = getChatModelLogo(option);
+  return logo ? (
+    <span className={clsx('flex shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/90', className)} aria-hidden="true">
+      <img src={logo} alt="" className="h-[72%] w-[72%] object-contain" />
+    </span>
+  ) : (
+    <span className={clsx('flex shrink-0 items-center justify-center rounded-md bg-accent-primary/12 text-accent-primary', className)} aria-hidden="true">
+      <Sparkles className="h-[58%] w-[58%]" />
+    </span>
+  );
+}
+
 export interface ChatSettingsSnapshot {
   api_endpoint?: string;
   api_key?: string;
@@ -184,6 +263,8 @@ export interface ChatComposerProps {
   modelOptions?: ChatModelOption[];
   selectedModelKey?: string;
   onSelectedModelKeyChange?: (key: string) => void;
+  reasoningEffort?: ChatReasoningEffort;
+  onReasoningEffortChange?: (effort: ChatReasoningEffort) => void;
   isBusy?: boolean;
   audioState?: ChatComposerAudioState;
   onAudioAction?: (() => void | Promise<void>) | null;
@@ -1197,6 +1278,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   modelOptions = [],
   selectedModelKey = '',
   onSelectedModelKeyChange,
+  reasoningEffort = 'low',
+  onReasoningEffortChange,
   isBusy = false,
   audioState = 'idle',
   onAudioAction,
@@ -1226,10 +1309,12 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 }, ref) {
   const textareaRef = useRef<HTMLDivElement>(null);
   const modelPickerRef = useRef<HTMLDivElement>(null);
+  const reasoningPickerRef = useRef<HTMLDivElement>(null);
   const memberPickerRef = useRef<HTMLDivElement>(null);
   const knowledgePickerRef = useRef<HTMLDivElement>(null);
   const knowledgeSearchInputRef = useRef<HTMLInputElement>(null);
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [showReasoningPicker, setShowReasoningPicker] = useState(false);
   const [memberMentionTrigger, setMemberMentionTrigger] = useState<{ start: number; end: number; query: string } | null>(null);
   const [memberMentionActiveIndex, setMemberMentionActiveIndex] = useState(0);
   const [knowledgeMentionTrigger, setKnowledgeMentionTrigger] = useState<{ start: number; end: number; query: string } | null>(null);
@@ -1251,9 +1336,11 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   const submitDisabled = disabled || isBusy || attachmentBusy || (!value.trim() && !attachment && !hasKnowledgeMentions && !hasSkillMentions && !hasAssetMentions);
   const showAttachmentButton = Boolean(onPickAttachment);
   const showModelSelector = Boolean(onSelectedModelKeyChange);
+  const showReasoningSelector = Boolean(onReasoningEffortChange);
   const showAudioButton = Boolean(onAudioAction);
   const showCancelButton = Boolean(onCancel) && showCancelWhenBusy && isBusy;
   const canOpenModelPicker = showModelSelector && modelOptions.length > 0;
+  const selectedReasoning = CHAT_REASONING_OPTIONS.find((item) => item.value === reasoningEffort) || CHAT_REASONING_OPTIONS[1];
   const memberMentionEnabled = Boolean(onSelectedMemberMentionChange);
   const skillMentionEnabled = Boolean(onSelectedSkillMentionsChange);
   const assetMentionEnabled = Boolean(onSelectedAssetMentionsChange);
@@ -1402,6 +1489,28 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [showModelPicker]);
+
+  useEffect(() => {
+    if (!showReasoningPicker) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!reasoningPickerRef.current?.contains(event.target as Node)) {
+        setShowReasoningPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [showReasoningPicker]);
+
+  useEffect(() => {
+    if (!showModelPicker && !showReasoningPicker) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setShowModelPicker(false);
+      setShowReasoningPicker(false);
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showModelPicker, showReasoningPicker]);
 
   useEffect(() => {
     if (!showMemberMentionPicker) return;
@@ -2182,45 +2291,111 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
               </button>
             ) : null}
 
-            {showModelSelector ? (
-              <div ref={modelPickerRef} className="relative flex items-center gap-4 px-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!modelOptions.length) return;
-                    setShowModelPicker((current) => !current);
-                  }}
-                  className={clsx('flex items-center gap-1.5 text-[13px] font-medium transition-colors', subtleButtonClass)}
-                >
-                  <span className="max-w-[180px] truncate">{selectedModel?.modelName || '默认模型'}</span>
-                  <ChevronDown className={clsx('h-3.5 w-3.5 transition-transform', showModelPicker && 'rotate-180')} />
-                </button>
-                {showModelPicker && (
-                  <div className={modelPickerClass}>
-                    {canOpenModelPicker ? modelOptions.map((option) => {
-                      const active = option.key === selectedModelKey;
-                      return (
-                        <button
-                          key={option.key}
-                          type="button"
-                          onClick={() => {
-                            onSelectedModelKeyChange?.(option.key);
-                            setShowModelPicker(false);
-                          }}
-                          className={clsx(
-                            'w-full px-3 py-2.5 text-left transition-colors',
-                            active ? 'bg-accent-primary/10 text-text-primary' : darkEmbedded ? 'text-white/68 hover:bg-white/6' : 'text-text-secondary hover:bg-surface-secondary/50',
-                          )}
-                        >
-                          <div className="truncate text-sm font-medium">{option.modelName}</div>
-                          <div className="truncate text-[11px] text-text-tertiary">{option.sourceName}</div>
-                        </button>
-                      );
-                    }) : (
-                      <div className="px-3 py-2 text-sm text-text-tertiary">请先在设置里配置供应商</div>
+            {showModelSelector || showReasoningSelector ? (
+              <div className="flex items-center gap-1 px-1">
+                {showModelSelector ? (
+                  <div ref={modelPickerRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!modelOptions.length) return;
+                        setShowReasoningPicker(false);
+                        setShowModelPicker((current) => !current);
+                      }}
+                      className={clsx('flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/55', subtleButtonClass)}
+                      aria-label={`选择模型，当前为 ${getChatModelDisplayName(selectedModel?.modelName || '')}`}
+                      aria-haspopup="menu"
+                      aria-expanded={showModelPicker}
+                      title={selectedModel ? `${getChatModelDisplayName(selectedModel.modelName)} · ${selectedModel.modelName}` : '选择模型'}
+                    >
+                      <ChatModelLogo option={selectedModel} className="h-5 w-5" />
+                      <span className="max-w-[180px] truncate">{getChatModelDisplayName(selectedModel?.modelName || '')}</span>
+                      <ChevronDown className={clsx('h-3.5 w-3.5 transition-transform', showModelPicker && 'rotate-180')} />
+                    </button>
+                    {showModelPicker && (
+                      <div className={modelPickerClass} role="menu" aria-label="选择对话模型">
+                        {canOpenModelPicker ? modelOptions.map((option) => {
+                          const active = option.key === selectedModelKey;
+                          return (
+                            <button
+                              key={option.key}
+                              type="button"
+                              onClick={() => {
+                                onSelectedModelKeyChange?.(option.key);
+                                setShowModelPicker(false);
+                              }}
+                              className={clsx(
+                                'flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-primary/55',
+                                active ? 'bg-accent-primary/10 text-text-primary' : darkEmbedded ? 'text-white/68 hover:bg-white/6' : 'text-text-secondary hover:bg-surface-secondary/50',
+                              )}
+                              role="menuitemradio"
+                              aria-checked={active}
+                              title={option.modelName}
+                            >
+                              <ChatModelLogo option={option} className="h-7 w-7" />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm font-medium">{getChatModelDisplayName(option.modelName)}</div>
+                                <div className="truncate text-[11px] text-text-tertiary">{option.sourceName}</div>
+                              </div>
+                              {active ? <Check className="h-4 w-4 shrink-0 text-accent-primary" /> : null}
+                            </button>
+                          );
+                        }) : (
+                          <div className="px-3 py-2 text-sm text-text-tertiary">请先在设置里配置供应商</div>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
+                ) : null}
+
+                {showReasoningSelector ? (
+                  <div ref={reasoningPickerRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowModelPicker(false);
+                        setShowReasoningPicker((current) => !current);
+                      }}
+                      className={clsx('flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/55', subtleButtonClass)}
+                      aria-label={`选择推理强度，当前为 ${selectedReasoning.label}`}
+                      aria-haspopup="menu"
+                      aria-expanded={showReasoningPicker}
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>推理 · {selectedReasoning.label}</span>
+                      <ChevronDown className={clsx('h-3.5 w-3.5 transition-transform', showReasoningPicker && 'rotate-180')} />
+                    </button>
+                    {showReasoningPicker ? (
+                      <div className={modelPickerClass} role="menu" aria-label="选择推理强度">
+                        {CHAT_REASONING_OPTIONS.map((option) => {
+                          const active = option.value === reasoningEffort;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => {
+                                onReasoningEffortChange?.(option.value);
+                                setShowReasoningPicker(false);
+                              }}
+                              className={clsx(
+                                'flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-primary/55',
+                                active ? 'bg-accent-primary/10 text-text-primary' : darkEmbedded ? 'text-white/68 hover:bg-white/6' : 'text-text-secondary hover:bg-surface-secondary/50',
+                              )}
+                              role="menuitemradio"
+                              aria-checked={active}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium">{option.label}</div>
+                                <div className="text-[11px] text-text-tertiary">{option.description}</div>
+                              </div>
+                              {active ? <Check className="h-4 w-4 shrink-0 text-accent-primary" /> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>

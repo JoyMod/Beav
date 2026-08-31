@@ -18,10 +18,23 @@ import {
   type ChatKnowledgeMentionOption,
   type ChatMemberMentionOption,
   type ChatModelOption,
+  type ChatReasoningEffort,
   type ChatSettingsSnapshot,
   type ChatSkillMentionOption,
   type UploadedFileAttachment,
 } from '../components/ChatComposer';
+
+const CHAT_REASONING_STORAGE_KEY = 'zhuye.chat.reasoningEffort';
+
+function readStoredChatReasoningEffort(): ChatReasoningEffort {
+  try {
+    const stored = window.localStorage.getItem(CHAT_REASONING_STORAGE_KEY);
+    if (stored === 'minimal' || stored === 'low' || stored === 'medium' || stored === 'high') return stored;
+  } catch {
+    // The app can still use the default when storage is unavailable.
+  }
+  return 'low';
+}
 import {
   MessageItem,
   Message,
@@ -1484,6 +1497,7 @@ export function Chat({
     };
   }, [onExecutionStateChange]);
   const [selectedChatModelKey, setSelectedChatModelKey] = useState('');
+  const [chatReasoningEffort, setChatReasoningEffort] = useState<ChatReasoningEffort>(readStoredChatReasoningEffort);
   const [isTranscribingAudio, setIsTranscribingAudio] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -1765,6 +1779,15 @@ export function Chat({
 
   const selectedChatModel = chatModelOptions.find((item) => item.key === selectedChatModelKey) || null;
 
+  const handleChatReasoningEffortChange = useCallback((effort: ChatReasoningEffort) => {
+    setChatReasoningEffort(effort);
+    try {
+      window.localStorage.setItem(CHAT_REASONING_STORAGE_KEY, effort);
+    } catch {
+      // Keep the in-memory selection when storage is unavailable.
+    }
+  }, []);
+
   const buildPendingAssistantTimeline = useCallback((label: string): ProcessItem[] => ([
     {
       id: `phase_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -1946,6 +1969,7 @@ export function Chat({
         apiKey: selectedChatModel.apiKey,
         baseURL: selectedChatModel.baseURL,
         modelName: selectedChatModel.modelName,
+        reasoningEffort: chatReasoningEffort,
         sourceId: selectedChatModel.sourceId,
         presetId: selectedChatModel.presetId,
       };
@@ -1976,7 +2000,7 @@ export function Chat({
       sourceId: resolved.sourceId,
       presetId: resolved.presetId,
     };
-  }, [selectedChatModel]);
+  }, [chatReasoningEffort, selectedChatModel]);
 
   // 判断是否是空会话（新建或无消息）
   const isEmptySession = messages.length === 0;
@@ -2052,6 +2076,7 @@ export function Chat({
       apiKey?: string;
       baseURL?: string;
       modelName?: string;
+      reasoningEffort?: ChatReasoningEffort;
       sourceId?: string;
       presetId?: string;
     };
@@ -3995,10 +4020,11 @@ export function Chat({
       apiKey: selectedChatModel.apiKey,
       baseURL: selectedChatModel.baseURL,
       modelName: selectedChatModel.modelName,
+      reasoningEffort: chatReasoningEffort,
       sourceId: selectedChatModel.sourceId,
       presetId: selectedChatModel.presetId,
     };
-  }, [selectedChatModel]);
+  }, [chatReasoningEffort, selectedChatModel]);
 
   const transcribeAudioClip = useCallback(async (clip: AudioRecordingClip) => {
     setIsTranscribingAudio(true);
@@ -4500,6 +4526,8 @@ export function Chat({
         modelOptions={chatModelOptions}
         selectedModelKey={selectedChatModelKey}
         onSelectedModelKeyChange={setSelectedChatModelKey}
+        reasoningEffort={chatReasoningEffort}
+        onReasoningEffortChange={handleChatReasoningEffortChange}
         isBusy={isProcessing}
         audioState={isTranscribingAudio ? 'transcribing' : audioRecording.isRecording ? 'recording' : 'idle'}
         onAudioAction={handleAudioInput}
