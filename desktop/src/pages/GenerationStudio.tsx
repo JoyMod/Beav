@@ -26,6 +26,7 @@ import clsx from 'clsx';
 import type { GenerationIntent, PendingChatMessage } from '../features/app-shell/types';
 import { subscribeSettingsUpdated } from '../bridge/appEvents';
 import type { UploadedFileAttachment } from '../components/ChatComposer';
+import { isLocalBrowserPreview } from '../utils/runtimeMode';
 import { useMediaJobSubscription } from '../features/media-jobs/useMediaJobSubscription';
 import { mediaJobsStore, shallowArrayEqual, useMediaJobsStore } from '../features/media-jobs/useMediaJobsStore';
 import { normalizeMediaJobProjection, type MediaJobProjection } from '../features/media-jobs/types';
@@ -757,7 +758,15 @@ function PopoverSelect({
                     (disabled || options.length === 0) && 'cursor-not-allowed opacity-55 hover:border-border',
                     className,
                 )}
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                aria-label={title ? `${title}：${active?.label || value || emptyText}` : active?.label || value || emptyText}
             >
+                {active?.logo && (
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/90" aria-hidden="true">
+                        <img src={active.logo} alt="" className="h-[72%] w-[72%] object-contain" />
+                    </span>
+                )}
                 <span className="truncate text-[12px] font-medium text-text-primary">{active?.label || value || emptyText}</span>
                 <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-accent-muted text-text-tertiary">
                     <ChevronDown className="h-3 w-3" />
@@ -766,6 +775,8 @@ function PopoverSelect({
 
             {open && (
                 <div
+                    role="listbox"
+                    aria-label={title || '选择选项'}
                     className={clsx(
                         'absolute bottom-[calc(100%+10px)] left-0 z-20 min-w-[96px] max-w-[340px] rounded-[20px] border border-border bg-surface-secondary p-3 shadow-[var(--ui-shadow-2)]',
                         panelClassName,
@@ -801,8 +812,15 @@ function PopoverSelect({
                                             ? 'border-brand-red/50 bg-brand-red text-white'
                                             : 'border-transparent bg-surface-tertiary text-text-secondary hover:bg-accent-muted',
                                     )}
+                                    role="option"
+                                    aria-selected={selected}
                                 >
                                     <div className="flex min-w-0 items-center gap-2">
+                                        {option.logo && (
+                                            <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/90" aria-hidden="true">
+                                                <img src={option.logo} alt="" className="h-[72%] w-[72%] object-contain" />
+                                            </span>
+                                        )}
                                         {option.tone === 'danger' && (
                                             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red" />
                                         )}
@@ -1986,6 +2004,12 @@ export function GenerationStudio({
             return;
         }
 
+        if (isLocalBrowserPreview()) {
+            setAgentSessionError('当前为安全预览模式，Agent 创作会话请在桌面客户端中使用。');
+            setIsAgentSessionLoading(false);
+            return;
+        }
+
         const requestId = ++agentSessionRequestIdRef.current;
         setIsAgentSessionLoading(true);
         setAgentSessionError('');
@@ -2000,6 +2024,9 @@ export function GenerationStudio({
                     metadata: generationAgentSessionMetadata,
                 });
                 if (requestId !== agentSessionRequestIdRef.current) return;
+                if (!session?.id) {
+                    throw new Error('创作会话初始化失败，请重新进入自由创作后再试。');
+                }
                 setAgentSessionId(session.id);
                 const rawSessionTimestamp = session.createdAt || session.created_at || session.updatedAt || Date.now();
                 const numericSessionTimestamp = typeof rawSessionTimestamp === 'number'
@@ -4145,7 +4172,7 @@ export function GenerationStudio({
                                         )}
 
                                         {visibleError && (
-                                            <div className="rounded-[14px] bg-brand-red/10 px-4 py-3 text-sm text-brand-red">
+                                            <div role="alert" className="rounded-[14px] bg-brand-red/10 px-4 py-3 text-sm text-brand-red">
                                                 {visibleError}
                                             </div>
                                         )}
@@ -4164,7 +4191,7 @@ export function GenerationStudio({
 
                                         {studioMode === 'video' && !isAgentMode && !hasVideoConfig && (
                                             <div className="rounded-[14px] bg-brand-red/10 px-4 py-3 text-sm text-brand-red">
-                                                未检测到生视频配置。请先完成官方视频登录或填写视频生成所需的 API Key。
+                                                未检测到生视频配置。请先到“设置 → AI 模型 → 生视频”填写 Endpoint、API Key 和模型。
                                             </div>
                                         )}
 

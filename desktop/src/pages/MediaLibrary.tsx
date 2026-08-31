@@ -7,7 +7,6 @@ import { formatTimestampDate, parseTimestampMs } from '../utils/time';
 import { appAlert, appConfirm } from '../utils/appDialogs';
 import { getLiquidGlassMenuItemClassName, LiquidGlassMenuPanel } from '@/components/ui/liquid-glass-menu';
 import { MediaAssetPreviewOverlay } from './media-library/MediaAssetPreviewOverlay';
-import { APP_BRAND } from '../config/brand';
 
 type MediaAssetSource = 'generated' | 'planned' | 'imported';
 
@@ -1704,7 +1703,7 @@ export function MediaLibrary({
                         <div className="p-5 space-y-4">
                             {!hasVideoConfig && (
                                 <div className="text-xs text-status-error">
-                                    未检测到可用的 {APP_BRAND.displayName} 官方视频配置。请先登录或配置 {APP_BRAND.displayName} 官方供应商。
+                                    未检测到生视频配置。请先到“设置 → AI 模型 → 生视频”填写 Endpoint、API Key 和模型。
                                 </div>
                             )}
 

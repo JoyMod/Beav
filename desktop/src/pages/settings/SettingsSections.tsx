@@ -5657,9 +5657,10 @@ export function ToolsSettingsSection({
 interface SettingsSaveBarProps {
     activeTab: 'general' | 'ai' | 'team' | 'platforms' | 'skills' | 'mcp' | 'tools' | 'profile' | 'memory' | 'remote' | 'experimental';
     status: 'idle' | 'saving' | 'saved' | 'error';
+    readOnlyPreview?: boolean;
 }
 
-export function SettingsSaveBar({ activeTab, status }: SettingsSaveBarProps) {
+export function SettingsSaveBar({ activeTab, status, readOnlyPreview = false }: SettingsSaveBarProps) {
     const { t } = useI18n();
     if (activeTab !== 'general' && activeTab !== 'ai' && activeTab !== 'profile' && activeTab !== 'platforms' && activeTab !== 'experimental') {
         return null;
@@ -5670,17 +5671,19 @@ export function SettingsSaveBar({ activeTab, status }: SettingsSaveBarProps) {
     return (
         <div className="fixed bottom-0 left-48 right-0 z-20 flex items-center justify-between border-t border-border bg-surface-primary/95 px-8 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl transition-all">
             <div className="text-xs">
+                {readOnlyPreview && <span className="text-text-tertiary">安全预览模式：配置只读</span>}
                 {status === 'saved' && <span className="text-status-success">{t('settings.save.saved')}</span>}
                 {status === 'error' && <span className="text-status-error">{t('settings.save.error')}</span>}
             </div>
 
             <button
                 type="submit"
-                disabled={status === 'saving'}
+                disabled={status === 'saving' || readOnlyPreview}
+                title={readOnlyPreview ? '请在桌面客户端中修改并保存配置' : buttonLabel}
                 className="flex items-center px-6 py-2 bg-text-primary text-background text-sm font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 shadow-sm"
             >
                 <Save className="w-4 h-4 mr-2" />
-                {status === 'saving' ? t('settings.save.saving') : buttonLabel}
+                {readOnlyPreview ? '仅查看' : status === 'saving' ? t('settings.save.saving') : buttonLabel}
             </button>
         </div>
     );

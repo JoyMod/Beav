@@ -32,6 +32,7 @@ import {
 import { clsx } from 'clsx';
 import { enforceModelCapabilityPolicy, getForcedModelCapabilities, inferModelCapabilities, normalizeModelCapabilities, type ModelCapability } from '../../shared/modelCapabilities';
 import { canonicalizeOfficialAutoSourceId, isOfficialAutoSourceId } from '../config/aiSources';
+import { getModelDisplayName, getModelLogo } from '../utils/modelPresentation';
 import { resolveAssetUrl } from '../utils/pathManager';
 import { ChatComposerFrame, getChatComposerPalette, type ChatComposerTheme, type ChatComposerVariant } from './ChatComposerFrame';
 
@@ -102,57 +103,11 @@ const CHAT_REASONING_OPTIONS: Array<{
   { value: 'high', label: '深度', description: '复杂任务，思考更充分' },
 ];
 
-export function getChatModelDisplayName(modelName: string): string {
-  const raw = String(modelName || '').trim();
-  if (!raw) return '默认模型';
-  const withoutRelease = raw.replace(/-(?:ga-)?\d{6,8}$/i, '');
-  const formatTail = (tail: string) => tail
-    .replace(/seed-(\d+)-(\d+)/i, 'Seed $1.$2')
-    .replace(/[-_]+/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((token) => {
-      if (/^v\d/i.test(token)) return token.toUpperCase();
-      if (/^\d+k$/i.test(token)) return token.toUpperCase();
-      if (/^(pro|flash|turbo|lite|max|mini|reasoner|sonnet|opus|haiku)$/i.test(token)) {
-        return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
-      }
-      return token;
-    })
-    .join(' ');
-  const knownBrands: Array<[RegExp, string]> = [
-    [/^deepseek[-_]?/i, 'DeepSeek'],
-    [/^doubao[-_]?/i, '豆包'],
-    [/^grok[-_]?/i, 'Grok'],
-    [/^claude[-_]?/i, 'Claude'],
-    [/^gemini[-_]?/i, 'Gemini'],
-    [/^qwen[-_]?/i, 'Qwen'],
-  ];
-  for (const [pattern, brand] of knownBrands) {
-    if (pattern.test(withoutRelease)) {
-      return `${brand} ${formatTail(withoutRelease.replace(pattern, ''))}`.trim();
-    }
-  }
-  if (/^gpt[-_]?/i.test(withoutRelease)) {
-    return `GPT-${withoutRelease.replace(/^gpt[-_]?/i, '')}`;
-  }
-  return formatTail(withoutRelease);
-}
+export const getChatModelDisplayName = getModelDisplayName;
 
 function getChatModelLogo(option?: ChatModelOption | null): string {
   if (!option) return '';
-  const model = option.modelName.toLowerCase();
-  const provider = `${option.presetId || ''} ${option.sourceId || ''} ${option.sourceName || ''}`.toLowerCase();
-  if (model.includes('deepseek')) return '/provider-logos/deepseek.svg';
-  if (model.includes('grok') || provider.includes('xai')) return '/provider-logos/xai.svg';
-  if (model.includes('doubao') || model.includes('seedance') || model.includes('seedream') || provider.includes('ark') || provider.includes('火山')) return '/provider-logos/volcengine.svg';
-  if (model.includes('claude') || provider.includes('anthropic')) return '/provider-logos/anthropic.svg';
-  if (model.includes('gemini') || provider.includes('gemini')) return '/provider-logos/gemini.svg';
-  if (model.includes('qwen') || provider.includes('dashscope') || provider.includes('通义')) return '/provider-logos/qwen.svg';
-  if (model.includes('kimi') || provider.includes('moonshot')) return '/provider-logos/kimi.svg';
-  if (model.includes('glm') || provider.includes('zhipu') || provider.includes('智谱')) return '/provider-logos/zhipu.svg';
-  if (model.includes('gpt') || model.includes('openai') || provider.includes('openai')) return '/provider-logos/openai.svg';
-  return '';
+  return getModelLogo(option.modelName, `${option.presetId || ''} ${option.sourceId || ''} ${option.sourceName || ''}`);
 }
 
 function ChatModelLogo({ option, className }: { option?: ChatModelOption | null; className: string }) {
@@ -2452,6 +2407,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             <button
               type="submit"
               disabled={submitDisabled}
+              aria-label={isBusy ? '停止生成' : '发送消息'}
+              title={isBusy ? '停止生成' : '发送消息'}
               className={clsx('flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200', sendButtonClass)}
             >
               {isBusy ? <Loader2 className="h-4 w-4 animate-spin text-[rgb(var(--color-text-tertiary))]" /> : <ArrowUp className="h-5 w-5" />}

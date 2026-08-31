@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Eye, EyeOff, FileText, Image as ImageIcon, Video, AudioLines } from 'lucide-react';
 import clsx from 'clsx';
 import { APP_BRAND } from '../../config/brand';
+import { getModelDisplayName, getModelLogo } from '../../utils/modelPresentation';
 import {
   type AiSourcePreset,
   type AiSourceConfig,
@@ -816,6 +817,19 @@ export const AiModelSelect = ({
   const selectedOption = useMemo(() => {
     return options.find((item) => item.id === value) || null;
   }, [options, value]);
+  const modelLabel = (option: AiModelOption | null | undefined) => {
+    if (!option) return placeholder;
+    return option.label && option.label !== option.id ? option.label : getModelDisplayName(option.id);
+  };
+  const renderModelLogo = (option: AiModelOption | null | undefined) => {
+    const logo = option ? getModelLogo(option.id) : '';
+    if (!logo) return null;
+    return (
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/90" aria-hidden="true">
+        <img src={logo} alt="" className="h-4 w-4 object-contain" />
+      </span>
+    );
+  };
   const resolveBadges = (option: AiModelOption | null | undefined) => {
     if (!option) return [] as Array<{ text: string; tone?: 'neutral'; className?: string }>;
     if (Array.isArray(option.badges) && option.badges.length > 0) {
@@ -887,7 +901,8 @@ export const AiModelSelect = ({
         )}
       >
         <span className="min-w-0 flex items-center gap-2 overflow-hidden">
-          <span className="truncate">{selectedOption?.label || selectedOption?.id || placeholder}</span>
+          {renderModelLogo(selectedOption)}
+          <span className="truncate" title={selectedOption?.id}>{modelLabel(selectedOption)}</span>
           {resolveBadges(selectedOption).map((badge) => (
             <span
               key={`${selectedOption?.id || 'selected'}-${badge.text}`}
@@ -925,7 +940,8 @@ export const AiModelSelect = ({
                   )}
                 >
                   <span className="min-w-0 flex items-center gap-2 flex-wrap">
-                    <span className="truncate">{option.label || option.id}</span>
+                    {renderModelLogo(option)}
+                    <span className="truncate" title={option.id}>{modelLabel(option)}</span>
                     {resolveBadges(option).map((badge) => (
                       <span
                         key={`${option.id}-${badge.text}`}

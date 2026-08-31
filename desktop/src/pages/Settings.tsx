@@ -15,6 +15,8 @@ import {
   isOfficialAutoSourceId
 } from '../config/aiSources';
 import { appAlert, appConfirm } from '../utils/appDialogs';
+import { getModelDisplayName, getModelLogo } from '../utils/modelPresentation';
+import { isLocalBrowserPreview } from '../utils/runtimeMode';
 import { AdvisorModal, AdvisorSettingsPanel, type Advisor } from './Advisors';
 import { subscribeSettingsUpdated } from '../bridge/appEvents';
 import { hasRenderableAssetUrl, resolveAssetUrl } from '../utils/pathManager';
@@ -856,6 +858,7 @@ export function Settings({
   onReturn?: () => void;
 }) {
   const { t } = useI18n();
+  const localBrowserPreview = isLocalBrowserPreview();
   const [activeTab, setActiveTab] = useState<SettingsTab>('ai');
   const [teamAdvisors, setTeamAdvisors] = useState<Advisor[]>([]);
   const [isTeamAdvisorsLoading, setIsTeamAdvisorsLoading] = useState(false);
@@ -5583,6 +5586,12 @@ export function Settings({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (localBrowserPreview) {
+      setStatus('error');
+      setTestStatus('error');
+      setTestMsg('当前为安全预览模式，仅支持查看本地配置。请在桌面客户端中修改并保存。');
+      return;
+    }
     if (aiSourceAutosaveTimerRef.current != null) {
       window.clearTimeout(aiSourceAutosaveTimerRef.current);
       aiSourceAutosaveTimerRef.current = null;
@@ -5868,7 +5877,7 @@ export function Settings({
         throw new Error('启用代理时必须填写代理地址，例如 http://127.0.0.1:7890');
       }
 
-      await window.ipcRenderer.saveSettings({
+      const saveResult = await window.ipcRenderer.saveSettings({
         ...formData,
         api_endpoint: String(resolvedChatSource?.baseURL || resolvedApiEndpoint).trim(),
         api_key: String(resolvedChatSource?.apiKey || resolvedApiKey).trim(),
@@ -5953,6 +5962,9 @@ export function Settings({
         chat_max_tokens_default: chatMaxTokensDefault,
         chat_max_tokens_deepseek: chatMaxTokensDeepseek,
       });
+      if (saveResult && typeof saveResult === 'object' && 'success' in saveResult && saveResult.success === false) {
+        throw new Error(String(('error' in saveResult && saveResult.error) || '配置保存失败，请重试。'));
+      }
       void window.ipcRenderer.analytics.track('settings_changed', {
         surface: 'settings',
         origin: 'renderer',
@@ -6634,6 +6646,50 @@ export function Settings({
               <div className="space-y-10">
                 {/* LLM Connection Config */}
                 <section className="space-y-6">
+                  {localBrowserPreview && (
+                    <div role="status" className="rounded-xl border border-accent-primary/25 bg-accent-primary/8 px-4 py-3 text-sm text-text-secondary">
+                      <div className="flex items-start gap-3">
+                        <Eye className="mt-0.5 h-4 w-4 shrink-0 text-accent-primary" />
+                        <div>
+                          <div className="font-medium text-text-primary">安全预览模式</div>
+                          <div className="mt-1 text-xs leading-5 text-text-tertiary">当前页面只展示已脱敏的本地配置；保存、连接检测和密钥修改请在桌面客户端中完成。</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-xl border border-border bg-surface-primary p-4 shadow-[var(--ui-shadow-1)]">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-sm font-semibold text-text-primary">当前模型组合</h2>
+                        <p className="mt-1 text-xs text-text-tertiary">常用模型一眼可见，完整 Endpoint 和密钥放在下方高级设置。</p>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {[
+                        { label: '日常对话', model: aiModelRoutes.chat.model || formData.model_name },
+                        { label: '多模态理解', model: aiModelRoutes.visualIndex.model || formData.visual_index_model },
+                        { label: '图片生成', model: aiModelRoutes.image.model || formData.image_model },
+                        { label: '视频生成', model: formData.video_model },
+                        { label: 'Embedding', model: aiModelRoutes.embedding.model || formData.embedding_model },
+                        { label: '声音合成', model: aiModelRoutes.voiceTts.model || formData.voice_tts_model || formData.tts_model },
+                      ].map((item) => {
+                        const model = String(item.model || '').trim();
+                        const logo = getModelLogo(model);
+                        return (
+                          <div key={item.label} className="flex min-w-0 items-center gap-3 rounded-lg border border-border/70 bg-surface-secondary/25 px-3 py-2.5">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/90" aria-hidden="true">
+                              {logo ? <img src={logo} alt="" className="h-5 w-5 object-contain" /> : <Cpu className="h-4 w-4 text-text-tertiary" />}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-[11px] text-text-tertiary">{item.label}</span>
+                              <span className="block truncate text-sm font-medium text-text-primary" title={model || '未配置'}>{model ? getModelDisplayName(model) : '未配置'}</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                   {officialAiPanelEnabled && (
                     <div ref={officialAiPanelRef} className="space-y-4 scroll-mt-6">
                       {OfficialAiPanelComponent ? (
@@ -6732,8 +6788,8 @@ export function Settings({
                                       ? '官方托管供应商 · 正在检查登录状态'
                                       : isOfficialSourceUnavailable
                                       ? '官方托管供应商 · 当前未登录，登录后自动同步官方模型与凭据'
-                                      : `已托管登录态 · 默认模型：${source.model || '(未设置)'} · 已添加 ${sourceModelsForDisplay.length} 个模型`
-                                    : `${preset?.label || 'Custom'} · 默认模型：${source.model || '(未设置)'} · 已添加 ${sourceModels.length} 个模型`}
+                                      : `已托管登录态 · 默认模型：${source.model ? getModelDisplayName(source.model) : '未设置'} · 已添加 ${sourceModelsForDisplay.length} 个模型`
+                                    : `${preset?.label || 'Custom'} · 默认模型：${source.model ? getModelDisplayName(source.model) : '未设置'} · 已添加 ${sourceModels.length} 个模型`}
                                 </p>
                               </div>
                               {isOfficialSourceUnavailable ? (
@@ -8195,6 +8251,7 @@ export function Settings({
             <SettingsSaveBar
               activeTab={activeTab}
               status={status}
+              readOnlyPreview={localBrowserPreview}
             />
           </form>
           {(editingTeamAdvisor || isCreatingTeamAdvisor) && (

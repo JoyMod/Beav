@@ -3648,8 +3648,11 @@ export function Subjects({ isActive = true, onReturnHome, onClose, variant = 'pa
                             </div>
 
                             {error && (
-                                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                                    {error}
+                                <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                    <span>{error}</span>
+                                    <button type="button" onClick={() => void loadData()} className="shrink-0 rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium transition-colors hover:bg-red-100">
+                                        重新加载
+                                    </button>
                                 </div>
                             )}
 
@@ -4010,8 +4013,11 @@ export function Subjects({ isActive = true, onReturnHome, onClose, variant = 'pa
 
             <div className={clsx('min-h-0 flex-1 overflow-auto py-5', isModalVariant ? 'px-5' : 'px-8')}>
                 {error && !isModalOpen && (
-                    <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                        {error}
+                    <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <span>{error}</span>
+                        <button type="button" onClick={() => void loadData()} className="shrink-0 rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium transition-colors hover:bg-red-100">
+                            重新加载
+                        </button>
                     </div>
                 )}
 

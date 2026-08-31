@@ -2,6 +2,7 @@ import { findAiPresetById, inferPresetIdByEndpoint, type AiSourceConfig } from '
 import { filterAiModelsByCapability, normalizeAiModelDescriptors, parseAiSources } from '../../pages/settings/shared';
 import type { GenerationAgentVoice } from './agentContext';
 import type { ModelRouteOverride } from './submitPayload';
+import { getModelDisplayName, getModelLogo } from '../../utils/modelPresentation';
 
 const DEFAULT_AUDIO_LANGUAGE_OPTIONS = [
     { value: '', label: '自动' },
@@ -37,6 +38,7 @@ export type SettingsShape = {
 export type PickerOption = {
     value: string;
     label: string;
+    logo?: string;
     description?: string;
     disabled?: boolean;
     disabledReason?: string;
@@ -134,7 +136,7 @@ export function buildImageModelOptions(settings: SettingsShape): PickerOption[] 
         for (const model of imageModels) {
             const existing = optionsByModel.get(model.id);
             if (!existing) {
-                optionsByModel.set(model.id, { label: model.id, sourceLabels: [sourceLabel] });
+                optionsByModel.set(model.id, { label: getModelDisplayName(model.id), sourceLabels: [sourceLabel] });
                 continue;
             }
             if (!existing.sourceLabels.includes(sourceLabel)) {
@@ -144,12 +146,13 @@ export function buildImageModelOptions(settings: SettingsShape): PickerOption[] 
     }
     const currentImageModel = String(settings.image_model || '').trim();
     if (currentImageModel && !optionsByModel.has(currentImageModel)) {
-        optionsByModel.set(currentImageModel, { label: currentImageModel, sourceLabels: ['当前设置'] });
+        optionsByModel.set(currentImageModel, { label: getModelDisplayName(currentImageModel), sourceLabels: ['当前设置'] });
     }
 
     return Array.from(optionsByModel.entries()).map(([value, option]) => ({
         value,
         label: option.label,
+        logo: getModelLogo(value, option.sourceLabels.join(' ')),
         description: option.sourceLabels.join(' / '),
     }));
 }
@@ -162,7 +165,7 @@ export function buildAudioModelOptions(settings: SettingsShape): PickerOption[] 
         if (!id) return;
         const existing = optionsByModel.get(id);
         if (!existing) {
-            optionsByModel.set(id, { label: id, sourceLabels: [sourceLabel] });
+            optionsByModel.set(id, { label: getModelDisplayName(id), sourceLabels: [sourceLabel] });
             return;
         }
         if (!existing.sourceLabels.includes(sourceLabel)) {
@@ -190,6 +193,7 @@ export function buildAudioModelOptions(settings: SettingsShape): PickerOption[] 
     return Array.from(optionsByModel.entries()).map(([value, option]) => ({
         value,
         label: option.label,
+        logo: getModelLogo(value, option.sourceLabels.join(' ')),
         description: option.sourceLabels.join(' / '),
     }));
 }
