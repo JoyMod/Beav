@@ -283,6 +283,9 @@ function getToolUsageGuide(tools: ToolDefinition<unknown, ToolResult>[]): string
     if (hasTool('web_search')) {
         categories.push('- `web_search`: current external information only');
     }
+    if (hasTool('provider_search')) {
+        categories.push('- `provider_search`: provider-native Web/X search with citations; required for current or time-sensitive information');
+    }
     if (hasTool('skill')) {
         categories.push('- `skill`: load specialized workflow instructions only when the task clearly matches');
     }

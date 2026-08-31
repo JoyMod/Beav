@@ -56,6 +56,12 @@ import { loadPrompt, renderPrompt } from '../prompts/runtime';
 import { getAgentRuntime, getTaskGraphRuntime, type PreparedRuntimeExecution, type RuntimeMode, type ThinkingBudget } from '../core/ai';
 import type { RuntimeEvent, RuntimeMessageContentPart } from '../core/runtimeTypes';
 import { getSessionRuntimeStore } from '../core/sessionRuntimeStore';
+import {
+  requiresProviderNativeSearch,
+  searchWithProviderNativeTools,
+  type NativeSearchModelConfig,
+  type NativeSearchRequest,
+} from '../core/providerNativeSearchService';
 
 interface SessionMetadata {
   associatedFilePath?: string;
@@ -129,6 +135,7 @@ export interface PreparedPiRuntimeTask {
   temperature: number;
   maxTurns: number;
   maxTimeMinutes: number;
+  requiresNativeSearch: boolean;
 }
 
 type PreparePiRuntimeOutcome =
@@ -278,6 +285,7 @@ export class PiChatService {
   private toolRegistry: ToolRegistry;
   private toolExecutor: ToolExecutor;
   private activeRuntimeExecution: PreparedRuntimeExecution | null = null;
+  private activeNativeSearchModelConfig: NativeSearchModelConfig | null = null;
   private discoveredWorkspaceForSkills: string | null = null;
   private readonly toolPack: BuiltinToolPack;
   private readonly workspacePathsOverride: ReturnType<typeof getWorkspacePaths> | null;
@@ -297,6 +305,7 @@ export class PiChatService {
       pack: this.toolPack,
       skillManager: this.skillManager,
       workspaceRootOverride: this.workspacePathsOverride?.base,
+      getNativeSearchModelConfig: () => this.activeNativeSearchModelConfig,
       onSkillActivated: (payload) => {
         this.sendToUI('chat:skill-activated', payload);
       },
@@ -706,6 +715,7 @@ export class PiChatService {
       maxTurns,
       maxTimeMinutes,
       temperature,
+      requiresNativeSearch,
     } = preparedOutcome;
     this.activeRuntimeExecution = preparedExecution;
 
@@ -745,6 +755,19 @@ export class PiChatService {
     }, 'plan');
 
     try {
+      this.activeNativeSearchModelConfig = { apiKey, baseURL, model: modelName };
+      if (preparedExecution.route.intent === 'direct_answer' && requiresNativeSearch) {
+        await this.runProviderNativeSearch({
+          content,
+          sessionId,
+          apiKey,
+          baseURL,
+          modelName,
+          preparedExecution,
+          signal,
+        });
+        return;
+      }
       this.emitDebugLog('info', 'agent:run:start');
       const generatedImages: GeneratedImagePreview[] = [];
       const generatedVideos: GeneratedVideoPreview[] = [];
@@ -780,7 +803,9 @@ export class PiChatService {
             modelName.toLowerCase().includes('grok') ? preparedExecution.thinkingBudget : undefined
           ),
           toolPack: 'redclaw',
-          toolNames: preparedExecution.route.intent === 'direct_answer' ? [] : undefined,
+          toolNames: preparedExecution.route.intent === 'direct_answer'
+            ? (requiresNativeSearch ? ['provider_search'] : [])
+            : undefined,
           runtimeMode,
           interactive: true,
           requiresHumanApproval: preparedExecution.route.requiresHumanApproval,
@@ -848,11 +873,100 @@ export class PiChatService {
     } finally {
       this.cleanupAgentSubscription();
       this.abortController = null;
+      this.activeNativeSearchModelConfig = null;
       this.activeRuntimeExecution = null;
       this.setRuntimeState({
         isProcessing: false,
       });
       this.emitDebugLog('info', 'sendMessage:done');
+    }
+  }
+
+  private async runProviderNativeSearch(params: {
+    content: string;
+    sessionId: string;
+    apiKey: string;
+    baseURL: string;
+    modelName: string;
+    preparedExecution: PreparedRuntimeExecution;
+    signal: AbortSignal;
+  }): Promise<void> {
+    const { content, sessionId, apiKey, baseURL, modelName, preparedExecution, signal } = params;
+    const useXSearch = modelName.toLowerCase().includes('grok')
+      && /(推特|twitter|\bx\b|x\.com)/i.test(content);
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
+    const request: NativeSearchRequest = {
+      query: content,
+      source: useXSearch ? 'x' : 'web',
+      ...((useXSearch && /(今天|今日|刚刚|最新)/i.test(content))
+        ? { fromDate: today, toDate: today }
+        : {}),
+    };
+    const callId = `provider_search_${Date.now()}`;
+    const providerLabel = modelName.toLowerCase().includes('grok')
+      ? (useXSearch ? 'Grok/X Search' : 'Grok Web Search')
+      : '火山方舟 Web Search';
+
+    this.emitDebugLog('info', 'provider-native-search:start', {
+      modelName,
+      source: request.source,
+    });
+    this.sendToUI('chat:tool-start', {
+      callId,
+      name: 'provider_search',
+      input: request,
+      description: `正在使用 ${providerLabel}`,
+    });
+
+    try {
+      const result = await searchWithProviderNativeTools(
+        { apiKey, baseURL, model: modelName },
+        request,
+        signal,
+      );
+      const newCitations = result.citations.filter((url) => !result.answer.includes(url));
+      const fullResponse = newCitations.length
+        ? `${result.answer}\n\n来源：\n${newCitations.map((url) => `- ${url}`).join('\n')}`
+        : result.answer;
+
+      this.sendToUI('chat:tool-end', {
+        callId,
+        name: 'provider_search',
+        output: {
+          success: true,
+          provider: result.provider,
+          citationCount: result.citations.length,
+        },
+      });
+      this.sendToUI('chat:response-chunk', { content: fullResponse });
+      this.setRuntimeState({ partialResponse: fullResponse });
+      addChatMessage({
+        id: `msg_${Date.now()}`,
+        session_id: sessionId,
+        role: 'assistant',
+        content: fullResponse,
+      });
+      getAgentRuntime().completeExecution(preparedExecution.task.id, {
+        responseLength: fullResponse.length,
+        streamedChunks: false,
+        providerNativeSearch: result.provider,
+      });
+      this.sendToUI('chat:response-end', { content: fullResponse });
+      this.emitDebugLog('info', 'provider-native-search:success', {
+        provider: result.provider,
+        responseLength: fullResponse.length,
+        citationCount: result.citations.length,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.sendToUI('chat:tool-end', {
+        callId,
+        name: 'provider_search',
+        output: { success: false, error: errorMessage },
+      });
+      getAgentRuntime().failExecution(preparedExecution.task.id, errorMessage);
+      this.emitDebugLog('error', 'provider-native-search:failed', { error: errorMessage });
+      this.sendToUI('chat:error', this.buildChatErrorPayload(error));
     }
   }
 
@@ -988,7 +1102,8 @@ export class PiChatService {
     };
     const agentRuntime = getAgentRuntime();
     const route = agentRuntime.analyzeRuntimeContext({ runtimeContext }).route;
-    const baseSystemPrompt = route.intent === 'direct_answer'
+    const requiresNativeSearch = requiresProviderNativeSearch(content);
+    const baseSystemPrompt = route.intent === 'direct_answer' && !requiresNativeSearch
       ? this.buildDirectAnswerSystemPrompt(metadata, longTermMemory, redClawProfileBundle)
       : this.buildSystemPrompt(
         workspacePaths,
@@ -1032,6 +1147,7 @@ export class PiChatService {
       temperature: 0.6,
       maxTurns: 100,
       maxTimeMinutes: 12,
+      requiresNativeSearch,
     };
   }
 

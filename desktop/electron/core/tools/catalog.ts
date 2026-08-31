@@ -1,10 +1,12 @@
 import type { ToolDefinition, ToolResult } from '../toolRegistry';
+import type { NativeSearchModelConfig } from '../providerNativeSearchService';
 
 export interface BuiltinToolFactoryContext {
     chatService?: any;
     skillManager?: any;
     onSkillActivated?: (payload: { name: string; description: string }) => void;
     workspaceRootOverride?: string;
+    getNativeSearchModelConfig?: () => NativeSearchModelConfig | null;
 }
 
 export type BuiltinToolPack = 'redclaw' | 'knowledge' | 'chatroom' | 'diagnostics' | 'full';

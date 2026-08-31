@@ -40,9 +40,11 @@ import { SkillTool, SkillManageTool, SkillInstallTool } from './skillTool';
 import { BashTool } from './bashTool';
 import { AppCliTool } from './appCliTool';
 import { WorkspaceTool } from './workspaceTool';
+import { ProviderNativeSearchTool } from './providerNativeSearchTool';
 import {
     createBuiltinToolInstances,
     type BuiltinToolPack,
+    type CreateBuiltinToolOptions,
     listBuiltinToolDescriptors,
     registerBuiltinToolDescriptor,
 } from './catalog';
@@ -90,6 +92,23 @@ const ensureBuiltinToolDescriptorsRegistered = (): void => {
         artifactOutput: ['command-output'],
         retryPolicy: 'manual',
         create: ({ workspaceRootOverride }) => new BashTool(workspaceRootOverride),
+    });
+    register({
+        name: 'provider_search',
+        displayName: '模型原生联网搜索',
+        description: 'Use the active model provider native server-side search tools.',
+        kind: ToolKind.Search,
+        contexts: ['redclaw', 'knowledge', 'chatroom'],
+        visibility: 'public',
+        requiresContext: null,
+        preconditions: ['active model provider must expose a compatible Responses API search tool'],
+        successSignal: 'provider answer and citations returned',
+        failureSignal: 'provider native search unsupported or request failed',
+        artifactOutput: ['search-result', 'citation'],
+        retryPolicy: 'manual',
+        create: ({ getNativeSearchModelConfig }) => (
+            getNativeSearchModelConfig ? new ProviderNativeSearchTool(getNativeSearchModelConfig) : null
+        ),
     });
     register({
         name: 'app_cli',
@@ -182,13 +201,7 @@ const ensureBuiltinToolDescriptorsRegistered = (): void => {
  * 创建所有内置工具实例
  * 注意：核心文件操作工具 (read, write, list 等) 现在由 ChatServiceV2 内部的 Vercel AI SDK 工具处理
  */
-export function createBuiltinTools(options: {
-    chatService?: any;
-    skillManager?: any;
-    onSkillActivated?: (payload: { name: string; description: string }) => void;
-    workspaceRootOverride?: string;
-    pack?: BuiltinToolPack;
-} = {}): ToolDefinition<unknown, ToolResult>[] {
+export function createBuiltinTools(options: CreateBuiltinToolOptions = {}): ToolDefinition<unknown, ToolResult>[] {
     ensureBuiltinToolDescriptorsRegistered();
     return createBuiltinToolInstances(options);
 }
@@ -204,6 +217,7 @@ export function getRegisteredBuiltinTools() {
 export const BUILTIN_TOOL_NAMES = [
     'workspace',
     'bash',
+    'provider_search',
     'app_cli',
     'skill',
     'calculator',

@@ -100,6 +100,11 @@ export class ChatService extends EventEmitter {
         this.toolRegistry.registerTools(createBuiltinTools({
             chatService: this,
             skillManager: this.skillManager,
+            getNativeSearchModelConfig: () => ({
+                apiKey: this.config.apiKey,
+                baseURL: this.config.baseURL,
+                model: this.config.model,
+            }),
             onSkillActivated: (payload) => this.emit('skill_activated', payload),
             pack: 'redclaw',
         }));
