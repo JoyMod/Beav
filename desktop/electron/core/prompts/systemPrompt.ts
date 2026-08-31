@@ -182,7 +182,7 @@ function getWorkspaceContext(paths: { base: string; skills: string; knowledge: s
         ``,
         `### How to Search Knowledge Base`,
         `1. **List knowledge items**: \`app_cli({ "command": "knowledge list --source redbook" })\` or \`app_cli({ "command": "knowledge list --source youtube" })\``,
-        `2. **Search keywords**: \`app_cli({ "command": "knowledge search --query \\"关键词\\"" })\` or \`bash({ "command": "rg -n \\"关键词\\" \\"${paths.base}/knowledge\\"" })\``,
+        `2. **Search local knowledge**: \`app_cli({ "command": "knowledge search --query \\"关键词\\"" })\` returns source snippets and automatically adds vector matches when Embedding is configured`,
         `3. **Read details**: \`bash({ "command": "cat \\"${paths.base}/knowledge/youtube/youtube_xxx/meta.json\\"" })\``,
         `4. **Read subtitle**: \`bash({ "command": "cat \\"${paths.base}/knowledge/youtube/youtube_xxx/{videoId}.txt\\"" })\``,
         ``,

@@ -2692,48 +2692,65 @@ const isVectorInSpace = (metadata: Record<string, any> | undefined, activeSpaceI
   return vectorSpaceId === activeSpaceId;
 };
 
-export const upsertVectors = (vectors: Omit<KnowledgeVector, 'created_at'>[]): void => {
-  const insert = db.prepare(`
-    INSERT INTO knowledge_vectors (id, source_id, source_type, chunk_index, content, embedding, metadata, content_hash)
-    VALUES (@id, @source_id, @source_type, @chunk_index, @content, @embedding, @metadata, @content_hash)
-    ON CONFLICT(id) DO UPDATE SET
-      content = @content,
-      embedding = @embedding,
-      metadata = @metadata,
-      content_hash = @content_hash
-  `);
+const getVectorIdsForSpace = (sourceId: string | null, activeSpaceId: string): string[] => {
+  const rows = sourceId
+    ? db.prepare('SELECT id, metadata FROM knowledge_vectors WHERE source_id = ?').all(sourceId)
+    : db.prepare('SELECT id, metadata FROM knowledge_vectors').all();
 
-  const transaction = db.transaction((vectors) => {
-    for (const v of vectors) {
-      insert.run({
-        ...v,
-        metadata: v.metadata ? JSON.stringify(v.metadata) : null,
-        content_hash: v.content_hash || null
-      });
-    }
-  });
-
-  transaction(vectors);
-};
-
-export const deleteVectors = (sourceId: string): void => {
-  const activeSpaceId = getActiveSpaceId();
-  const rows = db.prepare('SELECT id, metadata FROM knowledge_vectors WHERE source_id = ?').all(sourceId) as { id: string; metadata?: string }[];
-  const removeStmt = db.prepare('DELETE FROM knowledge_vectors WHERE id = ?');
-  const transaction = db.transaction((candidates: { id: string; metadata?: string }[]) => {
-    for (const row of candidates) {
+  return (rows as { id: string; metadata?: string }[])
+    .filter((row) => {
       let metadata: Record<string, any> | undefined;
       try {
         metadata = row.metadata ? JSON.parse(row.metadata) : undefined;
       } catch {
         metadata = undefined;
       }
-      if (isVectorInSpace(metadata, activeSpaceId)) {
-        removeStmt.run(row.id);
-      }
+      return isVectorInSpace(metadata, activeSpaceId);
+    })
+    .map((row) => row.id);
+};
+
+export const deleteVectors = (sourceId: string): number => {
+  const activeSpaceId = getActiveSpaceId();
+  const ids = getVectorIdsForSpace(sourceId, activeSpaceId);
+  const removeStmt = db.prepare('DELETE FROM knowledge_vectors WHERE id = ?');
+  const transaction = db.transaction((vectorIds: string[]) => {
+    for (const id of vectorIds) {
+      removeStmt.run(id);
     }
   });
-  transaction(rows);
+  transaction(ids);
+  return ids.length;
+};
+
+export const replaceVectorsForSource = (
+  sourceId: string,
+  vectors: Omit<KnowledgeVector, 'created_at'>[],
+): void => {
+  if (vectors.some((vector) => vector.source_id !== sourceId)) {
+    throw new Error('Vector source mismatch');
+  }
+
+  const activeSpaceId = getActiveSpaceId();
+  const existingIds = getVectorIdsForSpace(sourceId, activeSpaceId);
+  const removeStmt = db.prepare('DELETE FROM knowledge_vectors WHERE id = ?');
+  const insertStmt = db.prepare(`
+    INSERT INTO knowledge_vectors (id, source_id, source_type, chunk_index, content, embedding, metadata, content_hash)
+    VALUES (@id, @source_id, @source_type, @chunk_index, @content, @embedding, @metadata, @content_hash)
+  `);
+
+  db.transaction(() => {
+    for (const id of existingIds) {
+      removeStmt.run(id);
+    }
+    for (const vector of vectors) {
+      insertStmt.run({
+        ...vector,
+        metadata: vector.metadata ? JSON.stringify(vector.metadata) : null,
+        content_hash: vector.content_hash || null,
+      });
+    }
+  })();
 };
 
 export const getVectorHash = (sourceId: string): string | null => {
@@ -2773,8 +2790,15 @@ export const getVectorStats = () => {
   };
 };
 
-export const clearAllVectors = () => {
-  db.exec('DELETE FROM knowledge_vectors');
+export const clearVectorsForActiveSpace = (): number => {
+  const ids = getVectorIdsForSpace(null, getActiveSpaceId());
+  const removeStmt = db.prepare('DELETE FROM knowledge_vectors WHERE id = ?');
+  db.transaction(() => {
+    for (const id of ids) {
+      removeStmt.run(id);
+    }
+  })();
+  return ids.length;
 };
 
 // ========== File Index Lane & Event Queries ==========
@@ -2868,15 +2892,17 @@ export const getFileIndexEventsBySource = (sourceId: string, limit = 20) => {
  * 计算两个向量的余弦相似度
  */
 function cosineSimilarity(vecA: Float32Array, vecB: Float32Array): number {
-  if (vecA.length !== vecB.length) return 0;
+  if (vecA.length === 0 || vecA.length !== vecB.length) return 0;
   let dotProduct = 0;
   let normA = 0;
   let normB = 0;
   for (let i = 0; i < vecA.length; i++) {
+    if (!Number.isFinite(vecA[i]) || !Number.isFinite(vecB[i])) return 0;
     dotProduct += vecA[i] * vecB[i];
     normA += vecA[i] * vecA[i];
     normB += vecB[i] * vecB[i];
   }
+  if (normA === 0 || normB === 0) return 0;
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
@@ -2899,6 +2925,7 @@ export const searchVectors = (
   limit: number = 5,
   filter?: { advisorId?: string; scope?: 'user' | 'advisor' }
 ): SearchResult[] => {
+  // ponytail: 单机个人库先用 SQLite 全量余弦检索；出现实测延迟后再引入专用向量数据库。
   const activeSpaceId = getActiveSpaceId();
   // 1. 获取所有向量 (或者根据 source_type 初步过滤以减少计算量)
   // 为了性能，我们尽量只读取必要的字段。embedding 是 BLOB。
@@ -2918,7 +2945,7 @@ export const searchVectors = (
     // Apply filters
     if (filter) {
       if (filter.advisorId && metadata.advisorId !== filter.advisorId) continue;
-      // if (filter.scope && metadata.scope !== filter.scope) continue; // Optional scope filter
+      if (filter.scope && metadata.scope !== filter.scope) continue;
     }
     if (!isVectorInSpace(metadata, activeSpaceId)) continue;
 

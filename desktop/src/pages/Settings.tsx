@@ -999,6 +999,8 @@ export function Settings({
   const [testStatus, setTestStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [testMsg, setTestMsg] = useState('');
   const [testingAiSourceId, setTestingAiSourceId] = useState('');
+  const [isTestingEmbedding, setIsTestingEmbedding] = useState(false);
+  const [embeddingTestMsg, setEmbeddingTestMsg] = useState('');
   const [recentDebugLogs, setRecentDebugLogs] = useState<string[]>([]);
   const [isDebugLogsLoading, setIsDebugLogsLoading] = useState(false);
   const [fileIndexDashboard, setFileIndexDashboard] = useState<FileIndexDashboard | null>(
@@ -2299,6 +2301,37 @@ export function Settings({
       setTestMsg(error instanceof Error ? error.message : String(error));
     } finally {
       setTestingAiSourceId('');
+    }
+  };
+
+  const handleTestEmbeddingConnection = async () => {
+    if (!selectedEmbeddingSource) {
+      setEmbeddingTestMsg('请先选择 Embedding 供应商');
+      return;
+    }
+    const model = String(formData.embedding_model || '').trim();
+    if (!model) {
+      setEmbeddingTestMsg('请先选择 Embedding 模型');
+      return;
+    }
+
+    setIsTestingEmbedding(true);
+    setEmbeddingTestMsg('正在发送真实向量请求…');
+    try {
+      const result = await window.ipcRenderer.aiConfig.testAiConnection({
+        apiKey: selectedEmbeddingSource.apiKey,
+        baseURL: selectedEmbeddingSource.baseURL,
+        model,
+        presetId: selectedEmbeddingSource.presetId,
+        protocol: selectedEmbeddingSource.protocol || 'openai',
+        purpose: 'embedding',
+      });
+      if (!result.success) throw new Error(result.message || '向量连接失败');
+      setEmbeddingTestMsg(result.message);
+    } catch (error) {
+      setEmbeddingTestMsg(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsTestingEmbedding(false);
     }
   };
 
@@ -5206,60 +5239,6 @@ export function Settings({
     }
   }, [refreshTeamAdvisor]);
 
-  const handlePromoteTeamMemberSkillCandidate = useCallback(async (advisor: Advisor) => {
-    try {
-      await window.ipcRenderer.advisors.promoteMemberSkillCandidate({
-        advisorId: advisor.id,
-        candidateVersion: advisor.memberSkillCandidateVersion,
-      });
-      await refreshTeamAdvisor(advisor.id);
-    } catch (error) {
-      console.error('Failed to promote member skill candidate:', error);
-      setTestMsg('成员技能候选发布失败');
-      setStatus('error');
-    }
-  }, [refreshTeamAdvisor]);
-
-  const handleDiscardTeamMemberSkillCandidate = useCallback(async (advisor: Advisor) => {
-    try {
-      await window.ipcRenderer.advisors.discardMemberSkillCandidate({ advisorId: advisor.id });
-      await refreshTeamAdvisor(advisor.id);
-    } catch (error) {
-      console.error('Failed to discard member skill candidate:', error);
-      setTestMsg('成员技能候选丢弃失败');
-      setStatus('error');
-    }
-  }, [refreshTeamAdvisor]);
-
-  const handleRefreshTeamMemberSkill = useCallback(async (advisor: Advisor) => {
-    try {
-      const result = await window.ipcRenderer.advisors.distillMemberSkill({ advisorId: advisor.id }) as { success?: boolean; error?: string };
-      if (result && result.success === false) {
-        throw new Error(result.error || '成员技能蒸馏失败');
-      }
-      await refreshTeamAdvisor(advisor.id);
-    } catch (error) {
-      console.error('Failed to refresh member skill:', error);
-      void appAlert(`成员技能蒸馏失败：${error instanceof Error ? error.message : '未知错误'}`);
-    }
-  }, [refreshTeamAdvisor]);
-
-  const handleRollbackTeamMemberSkillVersion = useCallback(async (advisor: Advisor, version: string) => {
-    if (!version) return;
-    if (!(await appConfirm(`确定要把 ${advisor.name} 回滚到成员技能版本 "${version}" 吗？`, {
-      title: '回滚成员技能',
-      confirmLabel: '回滚',
-      tone: 'danger',
-    }))) return;
-    try {
-      await window.ipcRenderer.advisors.rollbackMemberSkillVersion({ advisorId: advisor.id, version });
-      await refreshTeamAdvisor(advisor.id);
-    } catch (error) {
-      console.error('Failed to rollback member skill version:', error);
-      setTestMsg('成员技能回滚失败');
-      setStatus('error');
-    }
-  }, [refreshTeamAdvisor]);
 
   const handleSaveTeamAdvisor = useCallback(async (
     data: Omit<Advisor, 'id' | 'createdAt' | 'knowledgeFiles'>,
@@ -7114,7 +7093,22 @@ export function Settings({
                   </div>
 
                   <div className="pt-4 border-t border-border space-y-3">
-                    <h3 className="text-sm font-medium text-text-primary">Embedding 模型设置</h3>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-medium text-text-primary">Embedding 模型设置</h3>
+                        {embeddingTestMsg && (
+                          <p className="mt-1 text-[11px] text-text-tertiary">{embeddingTestMsg}</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleTestEmbeddingConnection()}
+                        disabled={isTestingEmbedding || !selectedEmbeddingSource || !formData.embedding_model}
+                        className="shrink-0 rounded-lg border border-border bg-bg-secondary px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-accent-primary/50 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isTestingEmbedding ? '检测中…' : '真实连接检测'}
+                      </button>
+                    </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="group">
                           <label className="block text-xs font-medium text-text-secondary mb-1.5">
@@ -8224,10 +8218,6 @@ export function Settings({
                   onOptimizePrompt={() => void handleOptimizeTeamAdvisorPrompt(settingsTeamAdvisor)}
                   onUploadKnowledge={() => void handleUploadTeamAdvisorKnowledge(settingsTeamAdvisor)}
                   onDeleteKnowledge={(fileName) => void handleDeleteTeamAdvisorKnowledge(settingsTeamAdvisor, fileName)}
-                  onPromoteMemberSkillCandidate={() => void handlePromoteTeamMemberSkillCandidate(settingsTeamAdvisor)}
-                  onDiscardMemberSkillCandidate={() => void handleDiscardTeamMemberSkillCandidate(settingsTeamAdvisor)}
-                  onRefreshMemberSkill={() => handleRefreshTeamMemberSkill(settingsTeamAdvisor)}
-                  onRollbackMemberSkillVersion={(version) => void handleRollbackTeamMemberSkillVersion(settingsTeamAdvisor, version)}
                   onEdit={() => setEditingTeamAdvisor(settingsTeamAdvisor)}
                   onDelete={() => void handleDeleteTeamAdvisor(settingsTeamAdvisor)}
                   onClose={() => setSettingsTeamAdvisor(null)}

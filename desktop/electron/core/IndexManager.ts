@@ -1,5 +1,6 @@
 import { embeddingService } from './vector/EmbeddingService';
-import { upsertVectors, deleteVectors, KnowledgeVector, getVectorStats, clearAllVectors, getVectorHash, incrementKnowledgeVersion, getActiveSpaceId } from '../db';
+import { deleteVectors, KnowledgeVector, getVectorStats, clearVectorsForActiveSpace, getVectorHash, incrementKnowledgeVersion, getActiveSpaceId, replaceVectorsForSource } from '../db';
+import { vectorStore } from './vector/VectorStore';
 import { nanoid } from 'nanoid';
 import { EventEmitter } from 'events';
 import { createHash } from 'crypto';
@@ -24,6 +25,8 @@ export class IndexManager extends EventEmitter {
   private activeTasks: Map<string, { title: string; startTime: number; metadata?: any }> = new Map();
   private processedSessionCount = 0;
   private limiter: ConcurrencyLimiter;
+  private removedIds = new Set<string>();
+  private indexEpoch = 0;
 
   constructor() {
     super();
@@ -72,9 +75,15 @@ export class IndexManager extends EventEmitter {
    * 移除指定队列项
    */
   public removeItem(id: string) {
+    this.removedIds.add(id);
     const originalLength = this.queue.length;
     this.queue = this.queue.filter(i => i.id !== id);
-    if (this.queue.length !== originalLength) {
+    const deleted = deleteVectors(id);
+    if (deleted > 0) {
+      incrementKnowledgeVersion();
+      vectorStore.invalidateCache();
+    }
+    if (this.queue.length !== originalLength || deleted > 0) {
       this.emitStatus();
     }
   }
@@ -91,6 +100,7 @@ export class IndexManager extends EventEmitter {
    * 添加到索引队列
    */
   public async addToQueue(item: KnowledgeItem) {
+    this.removedIds.delete(item.id);
     // 简单的去重，如果已经在队列中则移除旧的
     this.queue = this.queue.filter(i => i.id !== item.id);
     this.queue.push(item);
@@ -106,10 +116,16 @@ export class IndexManager extends EventEmitter {
    * (需要外部传入遍历逻辑，这里仅提供接口)
    */
   public async clearAndRebuild() {
-    console.log('[IndexManager] Clearing all vectors...');
-    clearAllVectors();
+    console.log('[IndexManager] Clearing vectors for active space...');
+    this.indexEpoch++;
+    const deleted = clearVectorsForActiveSpace();
     this.queue = [];
+    this.removedIds.clear();
     this.processedSessionCount = 0;
+    if (deleted > 0) {
+      incrementKnowledgeVersion();
+      vectorStore.invalidateCache();
+    }
     this.emitStatus();
   }
 
@@ -123,16 +139,14 @@ export class IndexManager extends EventEmitter {
     }
 
     try {
+      const startedAtEpoch = this.indexEpoch;
       console.log(`[IndexManager] Indexing item: ${item.id} (${item.title})`);
 
-      // 1. 清理旧向量
-      deleteVectors(item.id);
-
-      // 2. 准备文本：合并标题和内容，增加语义丰富度
+      // 1. 准备文本：合并标题和内容，增加语义丰富度
       const fullText = `${item.title || ''}\n\n${item.content || ''}`.trim();
       if (!fullText) return false;
 
-      // 3. Content Hashing Check
+      // 2. Content Hashing Check
       const newHash = createHash('md5').update(fullText).digest('hex');
       const oldHash = getVectorHash(item.id);
 
@@ -141,13 +155,20 @@ export class IndexManager extends EventEmitter {
         return true;
       }
 
-      // 4. 文本切片
+      // 3. 文本切片
       const chunks = await embeddingService.createChunks(fullText);
 
-      // 5. 批量生成 Embedding
+      // 4. 批量生成 Embedding
       const vectors = await embeddingService.embedDocuments(chunks);
+      if (vectors.length !== chunks.length) {
+        throw new Error(`Embedding count mismatch: expected ${chunks.length}, got ${vectors.length}`);
+      }
+      const dimensions = vectors[0]?.length || 0;
+      if (!dimensions || vectors.some((vector) => vector.length !== dimensions || vector.some((value) => !Number.isFinite(value)))) {
+        throw new Error('Embedding response contains invalid or inconsistent vectors');
+      }
 
-      // 6. 构造 DB 数据
+      // 5. 构造 DB 数据
       // 将 displayData, scope, advisorId 等统一存入 metadata
       // 这样检索出来的 KnowledgeVector 就包含了完整的展示信息
       const unifiedMetadata = {
@@ -175,12 +196,18 @@ export class IndexManager extends EventEmitter {
         };
       });
 
-      // 7. 写入 DB
-      upsertVectors(vectorRecords);
+      if (this.removedIds.has(item.id) || startedAtEpoch !== this.indexEpoch) {
+        console.log(`[IndexManager] Item ${item.id} changed while indexing; skipping stale write.`);
+        return false;
+      }
+
+      // 6. 在同一事务中替换旧向量，Embedding 失败时保留旧索引。
+      replaceVectorsForSource(item.id, vectorRecords);
       this.processedSessionCount++;
 
-      // 8. 更新知识库版本号（触发相似度缓存失效）
+      // 7. 更新知识库版本号并立即清理进程内缓存。
       incrementKnowledgeVersion();
+      vectorStore.invalidateCache();
 
       console.log(`[IndexManager] Indexed ${item.id} (${chunks.length} chunks)`);
       return true;

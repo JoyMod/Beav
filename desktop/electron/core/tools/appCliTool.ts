@@ -34,7 +34,11 @@ import {
     getWanderHistory,
     saveWanderHistory,
     deleteWanderHistory,
+    getDocumentKnowledgeIndexSummary,
+    listDocumentKnowledgeIndexEntries,
+    searchVectors,
 } from '../../db';
+import { embeddingService } from '../vector/EmbeddingService';
 import {
     listUserMemoriesFromFile,
     addUserMemoryToFile,
@@ -2309,28 +2313,130 @@ export class AppCliTool extends DeclarativeTool<typeof AppCliParamsSchema> {
         }
 
         if (action === 'search') {
-            const query = requireString(readFlag(parsed.flags, 'query') || payload.query, 'query').toLowerCase();
-            const hits: Array<{ source: string; id: string; file: string }> = [];
+            const rawQuery = requireString(readFlag(parsed.flags, 'query') || payload.query, 'query');
+            const query = rawQuery.toLowerCase();
+            const requestedLimit = parseNumber(readFlag(parsed.flags, 'limit') || payload.limit) || 10;
+            const limit = Math.min(50, Math.max(1, requestedLimit));
+            type KnowledgeSearchHit = {
+                source: string;
+                id: string;
+                file: string;
+                title: string;
+                snippet: string;
+                method: 'keyword' | 'vector' | 'keyword+vector';
+                score?: number;
+            };
+            const hitsById = new Map<string, KnowledgeSearchHit>();
+            const snippetFor = (content: string): string => {
+                const compact = content.replace(/\s+/g, ' ').trim();
+                const index = compact.toLowerCase().indexOf(query);
+                const start = Math.max(0, index >= 0 ? index - 80 : 0);
+                return compact.slice(start, start + 320);
+            };
+
             for (const item of resolveRoots()) {
                 await fs.mkdir(item.root, { recursive: true });
                 const entries = await fs.readdir(item.root, { withFileTypes: true });
                 for (const entry of entries) {
                     if (!entry.isDirectory()) continue;
                     const id = entry.name;
-                    for (const file of ['content.md', 'meta.json']) {
-                        const fullPath = path.join(item.root, id, file);
+                    const itemRoot = path.join(item.root, id);
+                    let meta: Record<string, unknown> = {};
+                    try {
+                        meta = JSON.parse(await fs.readFile(path.join(itemRoot, 'meta.json'), 'utf-8')) as Record<string, unknown>;
+                    } catch {
+                        meta = {};
+                    }
+                    const contentFiles = ['content.md', 'transcript.txt'];
+                    const subtitleFile = String(meta.subtitleFile || '').trim();
+                    if (subtitleFile) contentFiles.push(subtitleFile);
+                    let matchedFile = '';
+                    let matchedContent = '';
+                    for (const file of contentFiles) {
                         try {
-                            const content = (await fs.readFile(fullPath, 'utf-8')).toLowerCase();
-                            if (content.includes(query)) {
-                                hits.push({ source: item.source, id, file });
+                            const content = await fs.readFile(path.join(itemRoot, file), 'utf-8');
+                            if (content.toLowerCase().includes(query)) {
+                                matchedFile = file;
+                                matchedContent = content;
+                                break;
                             }
                         } catch {
                             // ignore missing file
                         }
                     }
+                    if (!matchedContent) {
+                        const metaText = JSON.stringify(meta);
+                        if (metaText.toLowerCase().includes(query)) {
+                            matchedFile = 'meta.json';
+                            matchedContent = metaText;
+                        }
+                    }
+                    if (matchedContent) {
+                        hitsById.set(`${item.source}:${id}`, {
+                            source: item.source,
+                            id,
+                            file: matchedFile,
+                            title: String(meta.title || id),
+                            snippet: snippetFor(matchedContent),
+                            method: 'keyword',
+                        });
+                    }
                 }
             }
-            return { query, count: hits.length, hits };
+
+            if (source === 'all') {
+                for (const summary of getDocumentKnowledgeIndexSummary()) {
+                    // ponytail: 个人单机版每个文档源扫描 1000 个；真实资料量超过该上限时再升级到 SQLite FTS。
+                    const entries = listDocumentKnowledgeIndexEntries(summary.sourceId, 1000);
+                    for (const entry of entries) {
+                        try {
+                            const content = await fs.readFile(entry.absolutePath, 'utf-8');
+                            if (!`${entry.title || ''}\n${content}`.toLowerCase().includes(query)) continue;
+                            hitsById.set(`document:${summary.sourceId}:${entry.absolutePath}`, {
+                                source: 'document',
+                                id: summary.sourceId,
+                                file: entry.relativePath,
+                                title: entry.title || entry.relativePath,
+                                snippet: snippetFor(content),
+                                method: 'keyword',
+                            });
+                        } catch {
+                            // A tracked source may be temporarily offline; other local results remain usable.
+                        }
+                    }
+                }
+            }
+
+            let semantic: { available: boolean; error?: string } = { available: true };
+            try {
+                const queryVector = await embeddingService.embedQuery(rawQuery);
+                const vectorHits = searchVectors(queryVector, limit * 3, { scope: 'user' });
+                for (const hit of vectorHits) {
+                    const platform = String(hit.metadata?.platform || 'knowledge');
+                    if (source !== 'all' && platform !== source) continue;
+                    const key = `${platform}:${hit.sourceId}`;
+                    const existing = hitsById.get(key);
+                    hitsById.set(key, {
+                        source: platform,
+                        id: hit.sourceId,
+                        file: existing?.file || 'vector-index',
+                        title: String(hit.metadata?.title || existing?.title || hit.sourceId),
+                        snippet: existing?.snippet || hit.content,
+                        method: existing ? 'keyword+vector' : 'vector',
+                        score: Number(hit.score.toFixed(4)),
+                    });
+                }
+            } catch (error) {
+                semantic = {
+                    available: false,
+                    error: error instanceof Error ? error.message : String(error),
+                };
+            }
+
+            const hits = Array.from(hitsById.values())
+                .sort((a, b) => (b.score || 0) - (a.score || 0))
+                .slice(0, limit);
+            return { query: rawQuery, count: hits.length, semantic, hits };
         }
 
         throw new Error(`Unsupported knowledge action: ${action}`);

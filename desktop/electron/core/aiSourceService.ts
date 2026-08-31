@@ -13,7 +13,7 @@ export interface AiSourceConnectionInput {
   model?: string;
   presetId?: string;
   protocol?: AiProtocol;
-  purpose?: 'chat' | 'image';
+  purpose?: 'chat' | 'image' | 'embedding';
 }
 
 export interface AiModelInfo {
@@ -74,9 +74,12 @@ const withTimeout = async <T>(promise: Promise<T>, timeoutMs = 12000): Promise<T
 };
 
 const isLikelyLocalEndpoint = (baseURL: string): boolean => {
-  const normalized = normalizeApiBaseUrl(baseURL).toLowerCase();
-  if (!normalized) return false;
-  return LOCAL_HOST_HINTS.some((hint) => normalized.includes(hint));
+  try {
+    const hostname = new URL(normalizeApiBaseUrl(baseURL)).hostname.toLowerCase();
+    return LOCAL_HOST_HINTS.includes(hostname) || (hostname === '[::1]' && LOCAL_HOST_HINTS.includes('::1'));
+  } catch {
+    return false;
+  }
 };
 
 const isLocalPreset = (presetId?: string): boolean => {
@@ -343,7 +346,7 @@ export async function fetchModelsForAiSource(input: AiSourceConnectionInput): Pr
   const protocol = detectAiProtocol(input);
   const baseURL = normalizeApiBaseUrl(input.baseURL);
   const apiKey = String(input.apiKey || '').trim();
-  const purpose: 'chat' | 'image' = input.purpose === 'image' ? 'image' : 'chat';
+  const purpose = input.purpose === 'image' ? 'image' : input.purpose === 'embedding' ? 'embedding' : 'chat';
 
   if (!baseURL) {
     throw new Error('Base URL is required');
@@ -378,6 +381,9 @@ export async function fetchModelsForAiSource(input: AiSourceConnectionInput): Pr
 
 export async function testAiSourceConnection(input: AiSourceConnectionInput): Promise<AiConnectionTestResult> {
   const protocol = detectAiProtocol(input);
+  if (input.purpose === 'embedding' && protocol !== 'openai') {
+    throw new Error('Embedding 连接检测目前仅支持 OpenAI Compatible 协议');
+  }
   if (protocol !== 'openai') {
     const { models } = await fetchModelsForAiSource(input);
     return {
@@ -400,7 +406,34 @@ export async function testAiSourceConnection(input: AiSourceConnectionInput): Pr
     models = fetched.models;
     model = models[0]?.id || '';
   }
-  if (!model) throw new Error('请先添加并选择一个聊天模型或方舟 Endpoint ID');
+  if (!model) throw new Error(input.purpose === 'embedding' ? '请先添加并选择一个 Embedding 模型' : '请先添加并选择一个聊天模型或方舟 Endpoint ID');
+
+  if (input.purpose === 'embedding') {
+    const response = await withTimeout(fetch(safeUrlJoin(baseURL, '/embeddings'), {
+      method: 'POST',
+      headers: {
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model, input: ['竹叶向量连接测试'] }),
+    }));
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(`真实向量请求失败（HTTP ${response.status}）：${text || response.statusText}`);
+    }
+    const payload = await response.json() as { data?: Array<{ embedding?: unknown }> };
+    const vector = payload.data?.[0]?.embedding;
+    if (!Array.isArray(vector) || vector.length === 0 || vector.some((value) => !Number.isFinite(Number(value)))) {
+      throw new Error('接口返回成功，但没有收到有效向量');
+    }
+    return {
+      success: true,
+      protocol,
+      models: [{ id: model, capabilities: inferModelCapabilities(model) }],
+      verifiedModel: model,
+      message: `真实向量验证通过：${model}（${vector.length} 维）`,
+    };
+  }
 
   const response = await withTimeout(fetch(safeUrlJoin(baseURL, '/chat/completions'), {
     method: 'POST',

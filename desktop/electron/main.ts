@@ -2408,6 +2408,7 @@ function initializeTaskQueueWithExecutors() {
 ipcMain.handle('db:save-settings', async (_, settings) => {
   const normalized = normalizeSettingsInput((settings || {}) as Record<string, unknown>) as Parameters<typeof saveSettings>[0];
   const result = saveSettings(normalized);
+  embeddingService.reload();
   setDebugLoggingEnabled(Boolean(normalized.debug_log_enabled));
   await applyGlobalNetworkProxy((getSettings() || {}) as Record<string, unknown>);
   broadcastSettingsUpdated();
@@ -4436,6 +4437,7 @@ ipcMain.handle('ai:test-connection', async (_, payload: {
   model?: string;
   presetId?: string;
   protocol?: 'openai' | 'anthropic' | 'gemini';
+  purpose?: 'chat' | 'image' | 'embedding';
 }) => {
   const { detectAiProtocol, testAiSourceConnection } = await import('./core/aiSourceService');
   try {
@@ -4445,6 +4447,7 @@ ipcMain.handle('ai:test-connection', async (_, payload: {
       model: payload?.model || '',
       presetId: payload?.presetId,
       protocol: payload?.protocol,
+      purpose: payload?.purpose,
     });
     return result;
   } catch (error) {
@@ -11705,6 +11708,7 @@ ipcMain.handle('knowledge:delete', async (_, noteId: string) => {
 
   try {
     await fs.rm(notePath, { recursive: true, force: true });
+    indexManager.removeItem(noteId);
     return { success: true };
   } catch (error) {
     console.error('Failed to delete note:', error);
@@ -11744,16 +11748,19 @@ const deleteKnowledgeBatchItem = async (item: KnowledgeDeleteBatchItem) => {
   try {
     if (kind === 'youtube-video') {
       await fs.rm(resolveKnowledgeChildPath(getKnowledgeYoutubeDir(), id), { recursive: true, force: true });
+      indexManager.removeItem(id);
       return { id, kind, success: true };
     }
     if (kind === 'document-source') {
       const result = await deleteDocumentKnowledgeSource(id);
+      if (result.success) indexManager.removeItem(id);
       return { id, kind, success: result.success === true, error: result.success ? undefined : result.error || 'Failed to delete document source' };
     }
     if (!knowledgeNoteDeleteKinds.has(kind)) {
       return { id, kind, success: false, error: `Unsupported knowledge item kind: ${kind}` };
     }
     await fs.rm(resolveKnowledgeChildPath(getKnowledgeRedbookDir(), id), { recursive: true, force: true });
+    indexManager.removeItem(id);
     return { id, kind, success: true };
   } catch (error) {
     return { id, kind, success: false, error: String(error) };
@@ -11968,6 +11975,7 @@ ipcMain.handle('knowledge:delete-youtube', async (_, videoId: string) => {
 
   try {
     await fs.rm(videoPath, { recursive: true, force: true });
+    indexManager.removeItem(videoId);
     return { success: true };
   } catch (error) {
     console.error('Failed to delete YouTube video:', error);
@@ -14384,6 +14392,7 @@ ipcMain.handle('archives:samples:update', async (_, data: {
 
 ipcMain.handle('archives:samples:delete', async (_, sampleId: string) => {
   deleteArchiveSample(sampleId);
+  indexManager.removeItem(sampleId);
   emitRendererDataChanged('archives', { action: 'sample-delete', entityId: sampleId });
   return { success: true };
 });

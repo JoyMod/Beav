@@ -22,6 +22,11 @@ export class VectorStore {
     this.lastCacheTime = Date.now();
   }
 
+  public invalidateCache() {
+    this.vectors = [];
+    this.lastCacheTime = 0;
+  }
+
   /**
    * 向量相似度搜索
    * @param queryVector 查询向量
@@ -87,11 +92,13 @@ export class VectorStore {
    * 计算余弦相似度
    */
   private cosineSimilarity(a: number[] | Float32Array, b: number[] | Float32Array): number {
+    if (a.length === 0 || a.length !== b.length) return 0;
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
 
     for (let i = 0; i < a.length; i++) {
+      if (!Number.isFinite(a[i]) || !Number.isFinite(b[i])) return 0;
       dotProduct += a[i] * b[i];
       normA += a[i] * a[i];
       normB += b[i] * b[i];

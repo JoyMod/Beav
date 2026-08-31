@@ -28,7 +28,9 @@ const server = createServer((request, response) => {
       body: JSON.parse(body || '{}'),
     });
     response.writeHead(200, { 'Content-Type': 'application/json' });
-    response.end(JSON.stringify({ choices: [{ message: { content: 'OK' } }] }));
+    response.end(JSON.stringify(request.url?.endsWith('/embeddings')
+      ? { data: [{ embedding: [0.1, 0.2, 0.3] }] }
+      : { choices: [{ message: { content: 'OK' } }] }));
   });
 });
 
@@ -66,7 +68,27 @@ try {
   assert.equal(requests[0].body.model, 'ep-test-model');
   assert.deepEqual(requests[0].body.messages, [{ role: 'user', content: '请只回复 OK' }]);
 
-  console.log(JSON.stringify({ ok: true, protocol: 'openai-compatible', request: 'chat/completions' }, null, 2));
+  const embeddingResult = await testAiSourceConnection({
+    apiKey: '',
+    baseURL: `http://127.0.0.1:${address.port}/v1`,
+    model: 'local-embedding-model',
+    presetId: 'ollama-local',
+    protocol: 'openai',
+    purpose: 'embedding',
+  });
+  assert.equal(embeddingResult.success, true);
+  assert.equal(embeddingResult.verifiedModel, 'local-embedding-model');
+  assert.match(embeddingResult.message, /真实向量验证通过.*3 维/);
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].method, 'POST');
+  assert.equal(requests[1].url, '/v1/embeddings');
+  assert.equal(requests[1].authorization, undefined);
+  assert.deepEqual(requests[1].body, {
+    model: 'local-embedding-model',
+    input: ['竹叶向量连接测试'],
+  });
+
+  console.log(JSON.stringify({ ok: true, protocol: 'openai-compatible', requests: ['chat/completions', 'embeddings'] }, null, 2));
 } finally {
   await new Promise((resolve) => server.close(() => resolve()));
   await rm(tempRoot, { recursive: true, force: true });
