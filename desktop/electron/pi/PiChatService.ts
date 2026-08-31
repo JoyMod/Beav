@@ -774,6 +774,9 @@ export class PiChatService {
           maxTurns,
           maxTimeMinutes,
           temperature,
+          reasoningEffort: modelName.toLowerCase().includes('grok')
+            ? preparedExecution.thinkingBudget
+            : undefined,
           toolPack: 'redclaw',
           toolNames: preparedExecution.route.intent === 'direct_answer' ? [] : undefined,
           runtimeMode,
@@ -973,22 +976,27 @@ export class PiChatService {
       }
     }
 
-    const baseSystemPrompt = this.buildSystemPrompt(
-      workspacePaths,
-      metadata,
-      longTermMemory,
-      redClawProjectContext,
-      redClawProfileBundle,
-    );
-    const preparedExecution = await getAgentRuntime().prepareExecution({
-      runtimeContext: {
-        sessionId,
-        runtimeMode,
-        userInput: content,
-        metadata: metadata as Record<string, unknown>,
-        workspaceRoot: workspacePaths.workspaceRoot,
-        currentSpaceRoot: workspacePaths.base,
-      },
+    const runtimeContext = {
+      sessionId,
+      runtimeMode,
+      userInput: content,
+      metadata: metadata as Record<string, unknown>,
+      workspaceRoot: workspacePaths.workspaceRoot,
+      currentSpaceRoot: workspacePaths.base,
+    };
+    const agentRuntime = getAgentRuntime();
+    const route = agentRuntime.analyzeRuntimeContext({ runtimeContext }).route;
+    const baseSystemPrompt = route.intent === 'direct_answer'
+      ? this.buildDirectAnswerSystemPrompt(metadata, longTermMemory, redClawProfileBundle)
+      : this.buildSystemPrompt(
+        workspacePaths,
+        metadata,
+        longTermMemory,
+        redClawProjectContext,
+        redClawProfileBundle,
+      );
+    const preparedExecution = await agentRuntime.prepareExecution({
+      runtimeContext,
       baseSystemPrompt,
       llm: {
         apiKey,
@@ -3273,6 +3281,35 @@ export class PiChatService {
     }
 
     return promptParts.join('\n');
+  }
+
+  private buildDirectAnswerSystemPrompt(
+    metadata: SessionMetadata,
+    longTermMemory: string,
+    redClawProfileBundle?: RedClawProfilePromptBundle | null,
+  ): string {
+    const promptParts = [
+      '你是竹叶自媒体平台内的 RedClaw，本地优先的个人自媒体内容助手。',
+      '直接使用用户的语言回答当前问题，保持准确、简洁、自然。',
+      '当前路径不调用工具，也不要声称已经执行、保存、发布或验证任何外部操作。',
+      `当前时间：${new Date().toISOString()}`,
+    ];
+
+    if (longTermMemory) {
+      promptParts.push('', '用户长期记忆：', this.truncate(longTermMemory, 3000));
+    }
+    if (metadata.contextType === 'redclaw' && redClawProfileBundle) {
+      promptParts.push(
+        '',
+        'RedClaw 身份与用户偏好：',
+        this.truncate(redClawProfileBundle.files.identity || '', 1000),
+        this.truncate(redClawProfileBundle.files.soul || '', 1000),
+        this.truncate(redClawProfileBundle.files.user || '', 1500),
+        this.truncate(redClawProfileBundle.files.creatorProfile || '', 1500),
+      );
+    }
+
+    return promptParts.filter(Boolean).join('\n');
   }
 
   private buildPackageAgentPrompt(metadata: SessionMetadata): string {

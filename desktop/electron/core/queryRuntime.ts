@@ -568,6 +568,7 @@ export class QueryRuntime {
       body: JSON.stringify({
         model: this.config.model,
         temperature: this.config.temperature ?? 0.5,
+        ...(this.config.reasoningEffort ? { reasoning_effort: this.config.reasoningEffort } : {}),
         messages,
         stream: true,
         ...(toolSchemas.length > 0 ? { tools: toolSchemas } : {}),

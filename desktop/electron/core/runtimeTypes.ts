@@ -63,6 +63,7 @@ export interface RuntimeConfig {
   maxTurns?: number;
   maxTimeMinutes?: number;
   temperature?: number;
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
   toolPack: string;
   toolNames?: string[];
   runtimeMode?: string;

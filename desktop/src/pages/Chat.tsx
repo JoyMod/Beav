@@ -4111,6 +4111,7 @@ export function Chat({
       setErrorNotice(attachmentBlockReason);
       return;
     }
+    responseCompletedRef.current = false;
     const runtimeMessage = normalizedContent || displayBody || displayText || (hasAttachments ? '请分析这些附件。' : '');
     const assetReferencesForSend = assetMentions.map((item) => ({
       id: item.id,
