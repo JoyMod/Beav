@@ -1,12 +1,12 @@
 # FreeCut Attribution
 
 This subtree contains source vendored from the FreeCut project and adapted for
-RedBox integration.
+竹叶自媒体平台 integration.
 
 ## Scope
 
 - Vendored path: `src/vendor/freecut/**`
-- Primary RedBox integration points:
+- Primary 竹叶自媒体平台 integration points:
   - `src/components/manuscripts/freecutTimelineCapabilities.ts`
   - `src/vendor/freecut/features/timeline/deps/*`
 
@@ -46,8 +46,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## RedBox Note
+## 竹叶自媒体平台 Note
 
 This file is an attribution marker for the vendored subtree only. It does not
-change RedBox ownership for surrounding integration code outside
+change 竹叶自媒体平台 ownership for surrounding integration code outside
 `src/vendor/freecut/**`.

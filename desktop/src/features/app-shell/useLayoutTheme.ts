@@ -54,9 +54,11 @@ export function useLayoutTheme(immersiveMode: ImmersiveMode): {
     const effectiveTheme = immersiveMode === 'dark' ? 'dark' : themeMode;
     const windowTheme = immersiveMode === 'dark' ? effectiveTheme : themePreference === 'system' ? null : effectiveTheme;
     applyAppTheme(effectiveTheme);
-    void getCurrentWindow().setTheme(windowTheme).catch((error) => {
-      console.warn(`[${APP_BRAND.displayName}] failed to apply window theme:`, error);
-    });
+    if ('__TAURI_INTERNALS__' in window || '__TAURI__' in window) {
+      void getCurrentWindow().setTheme(windowTheme).catch((error) => {
+        console.warn(`[${APP_BRAND.displayName}] failed to apply window theme:`, error);
+      });
+    }
   }, [immersiveMode, themeMode, themePreference]);
 
   useEffect(() => {

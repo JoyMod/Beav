@@ -31,8 +31,8 @@
     "preview": "vite preview"
   },
   "build": {
-    "productName": "RedBox",
-    "artifactName": "RedBox-${version}-${arch}.${ext}",
+    "productName": "竹叶自媒体平台",
+    "artifactName": "竹叶自媒体平台-${version}-${arch}.${ext}",
     "appId": "com.redbox.app",
     "directories": {
       "output": "release"
@@ -79,8 +79,8 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "extendInfo": {
-        "CFBundleDisplayName": "RedBox",
-        "CFBundleName": "RedBox",
+        "CFBundleDisplayName": "竹叶自媒体平台",
+        "CFBundleName": "竹叶自媒体平台",
         "NSCameraUsageDescription": "This app requires camera access to record videos."
       },
       "notarize": {

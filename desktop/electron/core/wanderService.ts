@@ -159,7 +159,7 @@ function buildWanderDeepAgentPrompt(params: {
         : '';
 
     return [
-        '你现在处于 RedBox 的「漫步深度思考」Agent 模式。',
+        '你现在处于竹叶自媒体平台的「漫步深度思考」Agent 模式。',
         '你需要自主完成：分析素材 -> 发散选题 -> 收敛方向 -> 产出最终结构化结果。',
         '你必须先调用工具补充上下文，再给结论。',
         '',
@@ -592,7 +592,7 @@ export async function runWanderBrainstorm(options: WanderRunOptions = {}): Promi
     } else {
         const itemsText = buildWanderItemsText(items);
         const systemPrompt = [
-            '你在执行 RedBox 的随机漫步任务。',
+            '你在执行竹叶自媒体平台的随机漫步任务。',
             multiChoice
                 ? '请输出 3 个不同内容方向，最终只输出 JSON，字段包含 thinking_process 和 options。'
                 : '请输出 1 个内容方向，最终只输出 JSON，字段包含 content_direction、thinking_process、topic。',

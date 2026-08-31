@@ -1525,17 +1525,17 @@ function RemoteConnectionSettingsSectionInner({
         {
             id: 'codex',
             label: 'Codex',
-            text: `Read RedBox ACP manifest at ${acpManifestUrl}, then use /acp/v1/runs to talk to RedBox Creator Agent. Set client.name=Codex.`,
+            text: `Read 竹叶自媒体平台 ACP manifest at ${acpManifestUrl}, then use /acp/v1/runs to talk to 竹叶自媒体平台 Creator Agent. Set client.name=Codex.`,
         },
         {
             id: 'hermes',
             label: 'Hermes',
-            text: `Use RedBox local ACP at ${acpBaseUrl}/acp/v1. Read /guide first. Set client.name=Hermes.`,
+            text: `Use 竹叶自媒体平台 local ACP at ${acpBaseUrl}/acp/v1. Read /guide first. Set client.name=Hermes.`,
         },
         {
             id: 'openclaw',
             label: 'OpenClaw',
-            text: `Connect to RedBox Creator Agent through ${acpBaseUrl}/acp/v1/runs. Omit sessionId to auto-create an ACP-labeled RedBox session. Set client.name=OpenClaw.`,
+            text: `Connect to 竹叶自媒体平台 Creator Agent through ${acpBaseUrl}/acp/v1/runs. Omit sessionId to auto-create an ACP-labeled 竹叶自媒体平台 session. Set client.name=OpenClaw.`,
         },
     ]), [acpBaseUrl, acpManifestUrl]);
     const handleToggleExpandedChannel = (id: RemoteChannelId) => {

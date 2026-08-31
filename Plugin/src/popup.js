@@ -351,16 +351,16 @@ function renderDesktopConnection() {
     return;
   }
   if (desktopConnection.state === 'recovering') {
-    serverStatusEl.textContent = 'Beav 正在恢复连接，请稍候…';
+    serverStatusEl.textContent = '竹叶自媒体平台 正在恢复连接，请稍候…';
     serverStatusEl.className = 'status';
     return;
   }
   if (desktopConnection.state === 'attention') {
-    serverStatusEl.textContent = '连接需要处理，请升级 Beav 或重新加载插件';
+    serverStatusEl.textContent = '连接需要处理，请升级 竹叶自媒体平台 或重新加载插件';
     serverStatusEl.className = 'status error';
     return;
   }
-  serverStatusEl.textContent = '未连接 · 请打开 Beav';
+  serverStatusEl.textContent = '未连接 · 请打开 竹叶自媒体平台';
   serverStatusEl.className = 'status error';
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "com.redbox.browser_control",
-  "description": "Beav browser control native messaging host",
+  "description": "竹叶自媒体平台 browser control native messaging host",
   "path": "__HOST_PATH__",
   "type": "stdio",
   "allowed_origins": [

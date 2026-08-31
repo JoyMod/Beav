@@ -30,7 +30,7 @@ export function moveAgentCursor(options = {}) {
     isVisible: true,
     x,
     y,
-    label: String(options.label || 'Beav').slice(0, 12),
+    label: String(options.label || '竹叶自媒体平台').slice(0, 12),
     moveSequence,
     animateMovement: options.animateMovement !== false,
   };
@@ -48,7 +48,7 @@ export function applyAgentCursorState(state = {}) {
   return moveAgentCursor({
     x: state.cursor?.x,
     y: state.cursor?.y,
-    label: state.label || 'Beav',
+    label: state.label || '竹叶自媒体平台',
     moveSequence: state.cursor?.moveSequence,
     animateMovement: state.cursor?.animateMovement,
     sessionId: state.sessionId || '',

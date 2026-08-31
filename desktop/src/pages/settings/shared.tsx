@@ -493,6 +493,11 @@ export const AI_PRESET_LOGO_BY_ID: Record<string, string> = {
   infiniai: 'provider-logos/infiniai.svg',
   ctyun: 'provider-logos/ctyun.svg',
   stepfun: 'provider-logos/stepfun.svg',
+  groq: 'provider-logos/openai.svg',
+  together: 'provider-logos/openai.svg',
+  mistral: 'provider-logos/openai.svg',
+  fireworks: 'provider-logos/openai.svg',
+  'nvidia-nim': 'provider-logos/openai.svg',
   'stepfun-coding-openai': 'provider-logos/stepfun.svg',
   'stepfun-coding-anthropic': 'provider-logos/stepfun.svg',
 };

@@ -146,8 +146,8 @@ async function main() {
       `DOM query should read example.com link text, received: ${JSON.stringify(linkTexts)}`,
     );
     assert(
-      badgeTexts.some((text) => /(?:Beav|RedBox) 控制中/i.test(text)),
-      `controlled tab should show the Beav control badge, received: ${JSON.stringify(badgeTexts)}`,
+      badgeTexts.some((text) => /(?:竹叶自媒体平台|Beav|RedBox) 控制中/i.test(text)),
+      `controlled tab should show the 竹叶自媒体平台 control badge, received: ${JSON.stringify(badgeTexts)}`,
     );
     const researchStepResponse = await transport.callTool('research.run', {
       sessionId: 'smoke-session',

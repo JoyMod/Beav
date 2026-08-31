@@ -31,7 +31,7 @@ export async function readTabControlBadgeState(tabId) {
   return {
     visible: true,
     state: 'active',
-    label: 'Beav 控制中',
+    label: '竹叶自媒体平台 控制中',
     sessionName: String(session.name || '').trim(),
     sessionId: lease.sessionId || '',
     turnId: lease.turnId || '',

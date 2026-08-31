@@ -1,13 +1,13 @@
 ---
 name: redbox-video-director
-description: Use when generating short videos with RedBox official video API. Produces a detailed shot script first, asks the user to confirm it, then chooses between text-to-video, reference-guided, and first-last-frame modes and calls the correct wan2.7 video model with prompt discipline focused on motion, reference elements, and transitions.
+description: Use when generating short videos with the 竹叶自媒体平台 official video API. Produces a detailed shot script first, asks the user to confirm it, then chooses between text-to-video, reference-guided, and first-last-frame modes and calls the correct wan2.7 video model with prompt discipline focused on motion, reference elements, and transitions.
 when_to_use: Trigger for short video generation, motion clip creation, animated cover/video requests, reference-image video, image-to-video, or first/last frame transitions.
 allowed-tools: app_cli
 ---
 
-# RedBox Video Director
+# 竹叶自媒体平台 Video Director
 
-Use this skill before calling `app_cli(command="video generate ...")` for RedBox video work.
+Use this skill before calling `app_cli(command="video generate ...")` for 竹叶自媒体平台 video work.
 
 ## Default Workflow
 
@@ -57,7 +57,7 @@ This is preferred over keeping all video context only inside chat history.
 
 ## Hard Rules
 
-- RedBox video generation is locked to the RedBox official video route.
+- 竹叶自媒体平台 video generation is locked to the official video route.
 - Do not choose arbitrary video endpoints or third-party video models.
 - Use only these official model mappings:
   - `text-to-video` -> `wan2.7-t2v-video`

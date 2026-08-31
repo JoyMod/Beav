@@ -1,8 +1,8 @@
-# Beav Browser Runtime
+# 竹叶自媒体平台 Browser Runtime
 
 Desktop/Extension production compatibility, diagnostics, release gates, and privacy boundaries are documented in [`../../desktop/docs/browser-control-production-runbook.md`](../../desktop/docs/browser-control-production-runbook.md). This file defines the developer-facing browser facade; it is not a second discovery/retry/selection truth.
 
-Use this as the supported agent-side browser surface. It mirrors Codex Browser Use shape while routing through Beav Browser Control.
+Use this as the supported agent-side browser surface. It mirrors Codex Browser Use shape while routing through 竹叶自媒体平台 Browser Control.
 
 ```js
 const { setupBrowserRuntime } = await import("/Users/Jam/LocalDev/GitHub/RedConvert/Plugin/scripts/browser-client.mjs");
@@ -27,11 +27,11 @@ await browser.tabs.finalize({ keep: [] });
 - `browser.user.claimTab(tab)` claims a tab returned by `openTabs()`.
 - `browser.user.history({ query, limit })` reads bounded browser history metadata.
 - `browser.tabs.new({ url, active })` creates a controlled tab.
-- Claimed or newly created active tabs show a small non-interactive `Beav 控制中` page badge until the tab is finalized, released, or the turn ends.
+- Claimed or newly created active tabs show a small non-interactive `竹叶自媒体平台 控制中` page badge until the tab is finalized, released, or the turn ends.
 - `browser.tabs.get(id)` returns a controlled tab facade.
 - `browser.tabs.selected()` returns the active tab when available.
 - `browser.tabs.finalize({ keep })` closes or releases tabs at the end of the task.
-- `tab.goto(url)`, `tab.back()`, `tab.forward()`, `tab.reload()`, `tab.close()`, `tab.url()`, `tab.title()`, and `tab.screenshot()` map to Beav browser-control tools.
+- `tab.goto(url)`, `tab.back()`, `tab.forward()`, `tab.reload()`, `tab.close()`, `tab.url()`, `tab.title()`, and `tab.screenshot()` map to 竹叶自媒体平台 browser-control tools.
 - `tab.playwright.locator(selector)`, `getByRole`, `getByText`, `getByLabel`, `getByPlaceholder`, and `getByTestId` create locator facades.
 - Locator methods include `count`, `allTextContents`, `filter`, `and`, `or`, `first`, `last`, `nth`, `innerText`, `textContent`, `isEnabled`, `isVisible`, `getAttribute`, `click`, `dblclick`, `fill`, `type`, `press`, `check`, `uncheck`, `setChecked`, `selectOption`, and `waitFor`. Mutations and singleton reads are strict; use collection reads or an explicit index for multi-match locators.
 - `tab.cua` exposes coordinate mouse and keyboard primitives.

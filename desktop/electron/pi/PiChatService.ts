@@ -244,7 +244,7 @@ const TOOL_RESULT_MAX_DISPLAY_CHARS = 26000;
 const TOOL_RESULT_MAX_ERROR_CHARS = 4000;
 const PI_CHAT_SYSTEM_BASE_TEMPLATE = loadPrompt(
   'runtime/pi/system_base.txt',
-  'You are RedClaw, the self-media operations expert agent inside RedBox.\nCurrent date: {{current_date}}\nCurrent working directory: {{current_working_directory}}'
+  'You are RedClaw, the self-media operations expert agent inside 竹叶自媒体平台.\nCurrent date: {{current_date}}\nCurrent working directory: {{current_working_directory}}'
 );
 const PI_CHAT_VIDEO_EDITOR_TEMPLATE = loadPrompt('runtime/pi/video_editor.txt', '');
 const PI_CHAT_AUDIO_EDITOR_TEMPLATE = loadPrompt('runtime/pi/audio_editor.txt', '');
@@ -3223,8 +3223,8 @@ export class PiChatService {
         '- 只有当用户明确确认脚本后，才调用 `app_cli(command="video generate ...")`。',
         '- 如果需求简单且完整内容能稳定落在一个视频里，优先单视频模式；单个视频长度上限为 15 秒。',
         '- 如果需求复杂、镜头很多、场景切换频繁或叙事明显超出单视频稳定范围，应改用多视频模式：先拆成多个视频片段生成，再用 ffmpeg 工具按顺序拼接成最终成片。',
-        '- RedBox 官方视频模式选择规则：无参考图时用 `text-to-video`，并且不要传 `referenceImages`；当任务是“参考这些图片中的主体、元素、风格、道具、场景线索来做视频”时，用 `reference-guided`，可传 1 到 5 张参考图；只有当用户明确强调起始状态、结束状态、首尾帧、从图A过渡到图B时，才用 `first-last-frame`，并按“首帧,尾帧”顺序传 2 张图。',
-        '- RedBox 官方视频模型固定映射：`text-to-video -> wan2.7-t2v-video`，`reference-guided -> wan2.7-r2v-video`，`first-last-frame -> wan2.7-i2v-video`。不要自行改成别的视频模型。',
+        '- 竹叶自媒体平台官方视频模式选择规则：无参考图时用 `text-to-video`，并且不要传 `referenceImages`；当任务是“参考这些图片中的主体、元素、风格、道具、场景线索来做视频”时，用 `reference-guided`，可传 1 到 5 张参考图；只有当用户明确强调起始状态、结束状态、首尾帧、从图A过渡到图B时，才用 `first-last-frame`，并按“首帧,尾帧”顺序传 2 张图。',
+        '- 竹叶自媒体平台官方视频模型固定映射：`text-to-video -> wan2.7-t2v-video`，`reference-guided -> wan2.7-r2v-video`，`first-last-frame -> wan2.7-i2v-video`。不要自行改成别的视频模型。',
         '- 如果用户给了两张图，但意图只是“参考这两张图做视频”或“融合两张图元素”，不要直接用 `first-last-frame`；只有两张图分别承担首帧和尾帧语义时，才使用该模式。',
         '- 若当前模式不满足输入条件，必须明确说明原因；禁止静默改成别的模式后假装成功。',
         '- 当视频任务带有多张参考图或声音参考时，最终生成提示词必须先明确说明各参考资产的角色，例如“图1是人物主体，图2是场景氛围，音频1是人物声音参考”，再写镜头与动作描述。',

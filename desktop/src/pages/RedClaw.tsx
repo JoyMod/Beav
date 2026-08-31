@@ -995,7 +995,7 @@ export function RedClaw({
         ? selectedAdvisor.name
         : activeAiSurface === 'room' && selectedRoom
             ? selectedRoom.name || '未命名团队'
-            : `${REDCLAW_DISPLAY_NAME} 自媒体AI工作台`;
+            : REDCLAW_DISPLAY_NAME;
     const activeWelcomeIconSrc = activeAiSurface === 'advisor' && selectedAdvisor && isRenderableAdvisorAvatar(selectedAdvisor)
         ? resolveAssetUrl(selectedAdvisor.avatar)
         : REDCLAW_WELCOME_ICON_SRC;

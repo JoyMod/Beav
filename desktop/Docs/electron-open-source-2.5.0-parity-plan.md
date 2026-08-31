@@ -547,7 +547,7 @@ flowchart LR
 | ACP artifacts | 已返回文本响应 artifact | 补媒体、稿件、图片、视频项目、文件包 artifact |
 | Discovery | 已写 userData 与 `RedBox/acp-gateway.json` | Settings 显示路径和状态，停止时保留 listening=false |
 | 权限 | 当前等同本地无 token | 补 token/client/revoke，默认 local-only |
-| 品牌 | Electron 仍是 RedBox | 可保持 RedBox 开源壳；文案逐步说明 Beav/RedBox 关系 |
+| 品牌 | Electron 仍是 RedBox | 可保持 RedBox 开源壳；文案逐步说明 竹叶自媒体平台/RedBox 关系 |
 | 发布 | push 后自动同步到公开 repo | 增加开源 Electron 验证脚本，避免同步坏包 |
 
 ## 6. 性能策略

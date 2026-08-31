@@ -1,4 +1,4 @@
-RedBox Browser Extension — third-party notices
+竹叶自媒体平台æµè§å¨æä»¶ — third-party notices
 
 This distribution includes the following runtime dependencies in
 genericCaptureContent.js.

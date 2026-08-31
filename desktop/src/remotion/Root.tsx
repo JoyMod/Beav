@@ -7,7 +7,7 @@ export const REDBOX_REMOTION_COMPOSITION_ID = 'RedBoxVideoMotion';
 
 const DEFAULT_COMPOSITION: RemotionCompositionConfig = {
     version: 1,
-    title: 'RedBox Motion',
+    title: '竹叶自媒体平台动态视频',
     entryCompositionId: REDBOX_REMOTION_COMPOSITION_ID,
     width: 1080,
     height: 1920,

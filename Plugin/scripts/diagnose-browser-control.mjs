@@ -217,7 +217,7 @@ function discoverInstalledExtensions(targets) {
           const name = typeof manifest.name === 'string' ? manifest.name : '';
           const description = typeof manifest.description === 'string' ? manifest.description : '';
           const sourceMatches = sourcePath && extensionSourceRoots.includes(path.resolve(sourcePath));
-          const nameMatches = /Beav|RedBox|RedConvert/i.test(`${name}\n${description}`);
+          const nameMatches = /竹叶自媒体平台|Beav|RedBox|RedConvert/i.test(`${name}\n${description}`);
           if (!sourceMatches && !nameMatches) continue;
           matches.push({
             browser: target.id,

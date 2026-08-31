@@ -1,4 +1,4 @@
-import { OFFICIAL_AUTO_SOURCE_ID, canonicalizeOfficialAutoSourceId } from '../../config/aiSources';
+import { canonicalizeOfficialAutoSourceId, isOfficialAutoSourceId } from '../../config/aiSources';
 import type { McpServerConfig, RuntimePerfPreset } from '../../pages/settings/shared';
 import { createDefaultMcpServer } from '../../pages/settings/shared';
 
@@ -249,18 +249,18 @@ export const DEFAULT_VIDEO_ANALYSIS_ENABLED = true;
 export const DEFAULT_VISUAL_INDEX_ENABLED = false;
 
 export const DEFAULT_AI_MODEL_ROUTES: AiModelRoutes = {
-  chat: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: '' },
-  wander: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: '' },
-  team: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: '' },
-  knowledge: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: '' },
-  redclaw: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: '' },
-  transcription: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: '' },
-  embedding: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: '' },
-  image: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: '' },
-  visualIndex: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: '' },
-  videoAnalysis: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: '' },
-  voiceTts: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: DEFAULT_VOICE_TTS_MODEL },
-  voiceClone: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: DEFAULT_VOICE_CLONE_MODEL },
+  chat: { mode: 'disabled', sourceId: '', model: '' },
+  wander: { mode: 'disabled', sourceId: '', model: '' },
+  team: { mode: 'disabled', sourceId: '', model: '' },
+  knowledge: { mode: 'disabled', sourceId: '', model: '' },
+  redclaw: { mode: 'disabled', sourceId: '', model: '' },
+  transcription: { mode: 'disabled', sourceId: '', model: '' },
+  embedding: { mode: 'disabled', sourceId: '', model: '' },
+  image: { mode: 'disabled', sourceId: '', model: '' },
+  visualIndex: { mode: 'disabled', sourceId: '', model: '' },
+  videoAnalysis: { mode: 'disabled', sourceId: '', model: '' },
+  voiceTts: { mode: 'disabled', sourceId: '', model: '' },
+  voiceClone: { mode: 'disabled', sourceId: '', model: '' },
 };
 
 export const normalizeModelKey = (value: string) => String(value || '').trim().toLowerCase();
@@ -379,13 +379,15 @@ export function normalizeAiModelRoutes(value: unknown): AiModelRoutes {
     const route = source[key];
     if (!route || typeof route !== 'object') continue;
     const mode = String(route.mode || '').trim();
+    const sourceId = canonicalizeOfficialAutoSourceId(String(route.sourceId || '').trim());
+    const officialRoute = mode === 'official' || mode === 'inherit' || isOfficialAutoSourceId(sourceId);
     next[key] = {
-      mode: mode === 'custom' || mode === 'disabled' || mode === 'official'
-        ? mode
-        : mode === 'inherit'
-          ? 'official'
+      mode: officialRoute
+        ? 'disabled'
+        : mode === 'custom' || mode === 'disabled'
+          ? mode
           : DEFAULT_AI_MODEL_ROUTES[key].mode,
-      sourceId: canonicalizeOfficialAutoSourceId(String(route.sourceId || '').trim()) || DEFAULT_AI_MODEL_ROUTES[key].sourceId,
+      sourceId: officialRoute ? '' : sourceId || DEFAULT_AI_MODEL_ROUTES[key].sourceId,
       model: String(route.model || '').trim() || DEFAULT_AI_MODEL_ROUTES[key].model,
     };
   }

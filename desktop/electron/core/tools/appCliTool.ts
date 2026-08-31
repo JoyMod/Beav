@@ -567,8 +567,8 @@ function helpText(topic?: string): string {
                     'Mode rules:',
                     '- text-to-video: 不传参考图；只根据文字生成视频。',
                     '- reference-guided: 传 1 到 5 张参考图；主要复用这些图中的主体、元素、风格和构图线索，不是首尾帧过渡。',
-                    '- first-last-frame: 传 2 张参考图，并按“首帧,尾帧”顺序传入；在 RedBox 官方路由中会映射成 first_last_frame + media[]。',
-                    '- continuation: 传 1 段起始视频 `--first-clip`；在 RedBox 官方路由中会映射成 continuation + media[]。',
+                    '- first-last-frame: 传 2 张参考图，并按“首帧,尾帧”顺序传入；在竹叶自媒体平台官方路由中会映射成 first_last_frame + media[]。',
+                    '- continuation: 传 1 段起始视频 `--first-clip`；在竹叶自媒体平台官方路由中会映射成 continuation + media[]。',
                     '- 若未显式传 mode，app_cli 只会做安全兜底：0 个参考输入=文生视频，>=1 张参考图=参考图视频。首尾帧模式必须显式指定。',
                     '',
                 ]

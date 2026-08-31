@@ -215,10 +215,10 @@ export async function connectNativeTransport(options = {}) {
   const connectionState = classifyDesktopBridgeHandshake(handshake);
   const desktopBridgeConnected = connectionState === 'connected';
   const connectionError = connectionState === 'upgrade_required'
-    ? '当前 Beav 版本不支持 Desktop Bridge，请升级 Beav'
+    ? '当前 竹叶自媒体平台 版本不支持 Desktop Bridge，请升级 竹叶自媒体平台'
     : connectionState === 'bridge_error'
-      ? `Beav Desktop Bridge handshake failed: ${handshake?.desktopBridge?.errorCode || 'unknown'}`
-      : (desktopBridgeConnected ? '' : 'Beav desktop app is not connected');
+      ? `竹叶自媒体平台 Desktop Bridge handshake failed: ${handshake?.desktopBridge?.errorCode || 'unknown'}`
+      : (desktopBridgeConnected ? '' : '竹叶自媒体平台 desktop app is not connected');
   recordNativeTelemetry(connectionState, {
     hostName,
     handshake: true,
@@ -261,7 +261,7 @@ export function assertNativeHostVersionCompatibility(handshake = {}) {
   const actualCompatibility = actual.split('.')[0];
   if (!expected || !actual || expectedCompatibility !== actualCompatibility) {
     throw new Error(
-      `Native host major version mismatch: extension ${expected || 'unknown'}, host ${actual || 'unknown'}. Restart Beav and reload the extension.`,
+      `Native host major version mismatch: extension ${expected || 'unknown'}, host ${actual || 'unknown'}. Restart 竹叶自媒体平台 and reload the extension.`,
     );
   }
   return true;
@@ -553,10 +553,10 @@ async function performNativeReconnectAttempt(hostName = '') {
       await setNativeStatus(connectionState, {
         handshake,
         error: connectionState === 'upgrade_required'
-          ? '当前 Beav 版本不支持 Desktop Bridge，请升级 Beav'
+          ? '当前 竹叶自媒体平台 版本不支持 Desktop Bridge，请升级 竹叶自媒体平台'
           : connectionState === 'bridge_error'
-            ? `Beav Desktop Bridge handshake failed: ${handshake?.desktopBridge?.errorCode || 'unknown'}`
-            : 'Beav desktop app is not connected',
+            ? `竹叶自媒体平台 Desktop Bridge handshake failed: ${handshake?.desktopBridge?.errorCode || 'unknown'}`
+            : '竹叶自媒体平台 desktop app is not connected',
         errorCode: connectionState === 'upgrade_required'
           ? 'NATIVE_HOST_UPGRADE_REQUIRED'
           : connectionState === 'bridge_error'

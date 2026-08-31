@@ -1,4 +1,4 @@
-import { createBridgeCore } from './core';
+import { createBridgeCore, invokeLocalBrowserChannel } from './core';
 import { createAccountsBridge } from './domains/accountsBridge';
 import { createAdvisorsBridge } from './domains/advisorsBridge';
 import { createAiConfigBridge } from './domains/aiConfigBridge';
@@ -96,11 +96,11 @@ async function invokeChannel(channel: string, payload?: unknown): Promise<any> {
   try {
     const transport = getElectronTransport();
     if (!transport) {
-      throw new Error('Electron IPC transport is unavailable');
+      return await invokeLocalBrowserChannel(channel, payload);
     }
     return await transport.invoke(channel, payload ?? null);
   } catch (error) {
-    console.warn(`[RedBox] invoke failed for ${channel}:`, error);
+    console.warn(`[竹叶自媒体平台] invoke failed for ${channel}:`, error);
     return buildFallbackResponse(channel, error);
   }
 }
@@ -108,7 +108,7 @@ async function invokeChannel(channel: string, payload?: unknown): Promise<any> {
 function sendChannel(channel: string, payload?: unknown): void {
   const transport = getElectronTransport();
   if (!transport) {
-    console.warn(`[RedBox] send skipped for ${channel}: Electron IPC transport is unavailable`);
+    console.warn(`[竹叶自媒体平台] send skipped for ${channel}: Electron IPC transport is unavailable`);
     return;
   }
   transport.send(channel, payload ?? null);
@@ -118,11 +118,11 @@ async function invokeCommand(command: string, args?: unknown): Promise<any> {
   try {
     const transport = getElectronTransport();
     if (!transport) {
-      throw new Error('Electron IPC transport is unavailable');
+      return await invokeLocalBrowserChannel(explicitChannelByCommand[command] || command, args);
     }
     return await transport.invoke(explicitChannelByCommand[command] || command, args ?? null);
   } catch (error) {
-    console.warn(`[RedBox] command invoke failed for ${command}:`, error);
+    console.warn(`[竹叶自媒体平台] command invoke failed for ${command}:`, error);
     throw error;
   }
 }
@@ -156,7 +156,7 @@ async function invokeChannelGuarded<T = unknown>(
 
     if (value === Symbol.for('__redbox_ipc_timeout__')) {
       const timeoutError = new Error(`Timed out after ${timeoutMs}ms`);
-      console.warn(`[RedBox] invoke timed out for ${channel}:`, timeoutError.message);
+      console.warn(`[竹叶自媒体平台] invoke timed out for ${channel}:`, timeoutError.message);
       return resolveGuardFallback(channel, timeoutError, options?.fallback);
     }
 
@@ -164,14 +164,14 @@ async function invokeChannelGuarded<T = unknown>(
       try {
         return options.normalize(value);
       } catch (error) {
-        console.warn(`[RedBox] invoke normalization failed for ${channel}:`, error);
+        console.warn(`[竹叶自媒体平台] invoke normalization failed for ${channel}:`, error);
         return resolveGuardFallback(channel, error, options?.fallback);
       }
     }
 
     return value as T;
   } catch (error) {
-    console.warn(`[RedBox] guarded invoke failed for ${channel}:`, error);
+    console.warn(`[竹叶自媒体平台] guarded invoke failed for ${channel}:`, error);
     return resolveGuardFallback(channel, error, options?.fallback);
   }
 }
@@ -196,7 +196,7 @@ async function invokeCommandGuarded<T = unknown>(
 
     if (value === Symbol.for('__redbox_ipc_timeout__')) {
       const timeoutError = new Error(`Timed out after ${timeoutMs}ms`);
-      console.warn(`[RedBox] command invoke timed out for ${command}:`, timeoutError.message);
+      console.warn(`[竹叶自媒体平台] command invoke timed out for ${command}:`, timeoutError.message);
       return resolveGuardFallback(fallbackKey, timeoutError, options?.fallback);
     }
 
@@ -204,7 +204,7 @@ async function invokeCommandGuarded<T = unknown>(
       try {
         return options.normalize(value);
       } catch (error) {
-        console.warn(`[RedBox] command normalization failed for ${command}:`, error);
+        console.warn(`[竹叶自媒体平台] command normalization failed for ${command}:`, error);
         return resolveGuardFallback(fallbackKey, error, options?.fallback);
       }
     }
@@ -353,7 +353,7 @@ function buildFallbackResponse(channel: string, error: unknown): any {
   if (channel === 'subjects:generate-character-card') {
     return {
       success: false,
-      error: `RedBox subject character card generation failed: ${message}`,
+      error: `竹叶自媒体平台 subject character card generation failed: ${message}`,
     };
   }
   if (channel === 'media:list') {
@@ -437,7 +437,7 @@ function buildFallbackResponse(channel: string, error: unknown): any {
     || channel === 'background-tasks:retry'
     || channel === 'background-tasks:archive'
   ) {
-    return { success: false, error: `RedBox background task action failed for "${channel}": ${message}` };
+    return { success: false, error: `竹叶自媒体平台 background task action failed for "${channel}": ${message}` };
   }
   if (channel === 'background-workers:get-pool-state') {
     return { json: [], runtime: [] };
@@ -465,7 +465,7 @@ function buildFallbackResponse(channel: string, error: unknown): any {
     };
   }
   if (channel.startsWith('review:dockets:')) {
-    return { success: false, error: `RedBox review docket action failed for "${channel}": ${message}` };
+    return { success: false, error: `竹叶自媒体平台 review docket action failed for "${channel}": ${message}` };
   }
   if (channel === 'collab:sessions:get' || channel === 'team-runtime:get-session') {
     return {
@@ -477,10 +477,10 @@ function buildFallbackResponse(channel: string, error: unknown): any {
     };
   }
   if (channel.startsWith('collab:')) {
-    return { success: false, error: `RedBox collaboration action failed for "${channel}": ${message}` };
+    return { success: false, error: `竹叶自媒体平台 collaboration action failed for "${channel}": ${message}` };
   }
   if (channel.startsWith('team-runtime:')) {
-    return { success: false, error: `RedBox team runtime action failed for "${channel}": ${message}` };
+    return { success: false, error: `竹叶自媒体平台 team runtime action failed for "${channel}": ${message}` };
   }
   if (channel === 'chat:get-context-usage') {
     return {
@@ -497,16 +497,16 @@ function buildFallbackResponse(channel: string, error: unknown): any {
     return { success: true, canceled: true };
   }
   if (channel === 'chat:create-path-attachment') {
-    return { success: false, error: `RedBox path attachment failed: ${message}` };
+    return { success: false, error: `竹叶自媒体平台 path attachment failed: ${message}` };
   }
   if (channel === 'chat:create-video-thumbnail') {
-    return { success: false, error: `RedBox video thumbnail failed: ${message}` };
+    return { success: false, error: `竹叶自媒体平台 video thumbnail failed: ${message}` };
   }
   if (channel === 'chat:discard-attachments') {
-    return { success: false, error: `RedBox attachment cleanup failed: ${message}` };
+    return { success: false, error: `竹叶自媒体平台 attachment cleanup failed: ${message}` };
   }
   if (channel === 'chat:transcribe-audio') {
-    return { success: false, error: `RedBox audio transcription failed: ${message}` };
+    return { success: false, error: `竹叶自媒体平台 audio transcription failed: ${message}` };
   }
   if (channel === 'audio:get-capture-capability') {
     return {
@@ -514,7 +514,7 @@ function buildFallbackResponse(channel: string, error: unknown): any {
       available: false,
       activeRecording: false,
       reason: 'host_unavailable',
-      message: `RedBox audio capture unavailable: ${message}`,
+      message: `竹叶自媒体平台 audio capture unavailable: ${message}`,
     };
   }
   if (
@@ -523,7 +523,7 @@ function buildFallbackResponse(channel: string, error: unknown): any {
     || channel === 'audio:cancel-recording'
     || channel === 'audio:open-microphone-settings'
   ) {
-    return { success: false, error: `RedBox audio action failed for "${channel}": ${message}` };
+    return { success: false, error: `竹叶自媒体平台 audio action failed for "${channel}": ${message}` };
   }
   if (
     channel === 'capture:create-server-job'
@@ -576,7 +576,7 @@ function buildFallbackResponse(channel: string, error: unknown): any {
     || channel === 'mcp:call'
     || channel === 'mcp:import-local'
   ) {
-    return { success: false, servers: [], error: `RedBox MCP action failed for "${channel}": ${message}` };
+    return { success: false, servers: [], error: `竹叶自媒体平台 MCP action failed for "${channel}": ${message}` };
   }
   if (channel === 'plugins:list') {
     return {
@@ -625,7 +625,7 @@ function buildFallbackResponse(channel: string, error: unknown): any {
     || channel === 'plugins:sync-capabilities'
     || channel === 'plugins:read-data'
   ) {
-    return { success: false, error: `RedBox plugin action failed for "${channel}": ${message}` };
+    return { success: false, error: `竹叶自媒体平台 plugin action failed for "${channel}": ${message}` };
   }
   if (channel === 'plugins:home') {
     return { success: true, widgets: [], sidebarSections: [], quickActions: [] };
@@ -661,7 +661,7 @@ function buildFallbackResponse(channel: string, error: unknown): any {
       deleted: 0,
       failed: 0,
       results: [],
-      error: `RedBox knowledge batch delete failed: ${message}`,
+      error: `竹叶自媒体平台 knowledge batch delete failed: ${message}`,
     };
   }
   if (
@@ -671,13 +671,13 @@ function buildFallbackResponse(channel: string, error: unknown): any {
     || channel === 'file:save-zip'
     || channel === 'file:preview-resolve'
   ) {
-    return { success: false, error: `RedBox file action failed for "${channel}": ${message}` };
+    return { success: false, error: `竹叶自媒体平台 file action failed for "${channel}": ${message}` };
   }
   if (channel === 'youtube:check-ytdlp') {
-    return { success: false, installed: false, error: `RedBox yt-dlp check failed: ${message}` };
+    return { success: false, installed: false, error: `竹叶自媒体平台 yt-dlp check failed: ${message}` };
   }
   if (channel === 'youtube:install' || channel === 'youtube:update') {
-    return { success: false, error: `RedBox yt-dlp action failed: ${message}` };
+    return { success: false, error: `竹叶自媒体平台 yt-dlp action failed: ${message}` };
   }
   if (channel === 'plugin:browser-extension-status') {
     return {
@@ -718,7 +718,7 @@ function buildFallbackResponse(channel: string, error: unknown): any {
     || channel === 'cli-runtime:approve-escalation'
     || channel === 'cli-runtime:deny-escalation'
   ) {
-    return { success: false, error: `RedBox CLI runtime action failed for "${channel}": ${message}` };
+    return { success: false, error: `竹叶自媒体平台 CLI runtime action failed for "${channel}": ${message}` };
   }
   if (channel === 'indexing:get-stats') {
     return { totalStats: { vectors: 0, documents: 0 }, queue: [] };
@@ -751,7 +751,7 @@ function buildFallbackResponse(channel: string, error: unknown): any {
     return { success: false, error: 'App updater unavailable in Electron archive' };
   }
   if (channel === 'app:open-external-url' || channel === 'clipboard:write-html') {
-    return { success: false, error: `RedBox system action failed for "${channel}": ${message}` };
+    return { success: false, error: `竹叶自媒体平台 system action failed for "${channel}": ${message}` };
   }
   if (channel === 'debug:get-runtime-summary') {
     return {
@@ -798,7 +798,7 @@ function buildFallbackResponse(channel: string, error: unknown): any {
     || channel === 'logs:append-renderer'
     || channel === 'logs:create-auto-report'
   ) {
-    return { success: false, error: `RedBox diagnostics action failed for "${channel}": ${message}` };
+    return { success: false, error: `竹叶自媒体平台 diagnostics action failed for "${channel}": ${message}` };
   }
   if (
     channel === 'assistant:daemon-acp-client-create'
@@ -831,14 +831,14 @@ function buildFallbackResponse(channel: string, error: unknown): any {
 
   return {
     success: false,
-    error: `RedBox host request failed for "${channel}": ${message}`
+    error: `竹叶自媒体平台 host request failed for "${channel}": ${message}`
   };
 }
 
 function on(channel: string, listener: Listener): void {
   const transport = getElectronTransport();
   if (!transport) {
-    console.warn(`[RedBox] listener skipped for ${channel}: Electron IPC transport is unavailable`);
+    console.warn(`[竹叶自媒体平台] listener skipped for ${channel}: Electron IPC transport is unavailable`);
     return;
   }
   const entry: ListenerRecord = {};

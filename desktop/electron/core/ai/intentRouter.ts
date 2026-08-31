@@ -256,7 +256,7 @@ const callLlmRouter = async (params: {
   fallback: IntentRoute;
 }): Promise<IntentRoute | null> => {
   const systemPrompt = loadAndRenderPrompt(ROUTE_INTENT_SYSTEM_PROMPT_PATH, {}, [
-    'You are the intent router for RedBox.',
+    'You are the intent router for 竹叶自媒体平台.',
     'Return strict JSON only.',
   ].join('\n'));
   const userPrompt = loadAndRenderPrompt(ROUTE_INTENT_USER_PROMPT_PATH, {

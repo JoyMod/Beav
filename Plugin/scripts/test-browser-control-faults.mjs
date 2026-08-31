@@ -161,14 +161,14 @@ function testDesktopBridgeHandshakeClassification() {
   );
   assert.equal(
     shouldReportNativeConnectionFailure(
-      new Error('Beav desktop app is not connected'),
+      new Error('竹叶自媒体平台 desktop app is not connected'),
       { state: 'app_not_running' },
     ),
     false,
   );
   assert.equal(
     shouldReportNativeConnectionFailure(
-      Object.assign(new Error('Beav desktop bridge is reconnecting'), { code: 'APP_STARTING' }),
+      Object.assign(new Error('竹叶自媒体平台 desktop bridge is reconnecting'), { code: 'APP_STARTING' }),
       { state: 'app_starting' },
       { state: 'connected' },
     ),
@@ -176,7 +176,7 @@ function testDesktopBridgeHandshakeClassification() {
   );
   assert.equal(
     shouldReportNativeConnectionFailure(
-      new Error('Beav desktop app is not connected'),
+      new Error('竹叶自媒体平台 desktop app is not connected'),
       { state: 'app_not_running' },
       { state: 'connected' },
     ),

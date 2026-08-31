@@ -1,6 +1,6 @@
 # Browser Playwright
 
-Beav exposes a limited Playwright-shaped API through `tab.playwright`. It is not full upstream Playwright.
+竹叶自媒体平台 exposes a limited Playwright-shaped API through `tab.playwright`. It is not full upstream Playwright.
 
 - Use `domSnapshot()` for orientation and locator construction.
 - Use locators for scoped checks and actions.

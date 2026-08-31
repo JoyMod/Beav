@@ -854,7 +854,7 @@ async function getSettings() {
 async function resolveApiBase(force = false) {
   void force;
   cachedBaseUrl = null;
-  throw new Error('Beav browser-control HTTP bridge has been retired; use Native Messaging');
+  throw new Error('竹叶自媒体平台 browser-control HTTP bridge has been retired; use Native Messaging');
 }
 
 async function registerPlugin(force) {
@@ -884,7 +884,7 @@ async function ensureAppServerWithSidePanelGate(message = {}) {
   const isTargetCodexAlias = method === 'ensure_codex_app_server';
   try {
     const sidePanel = await requireSidePanelOpen(message.windowId || message.params?.windowId, {
-      closedError: isTargetCodexAlias ? 'Codex side panel is not open.' : 'Beav side panel is not open.',
+      closedError: isTargetCodexAlias ? 'Codex side panel is not open.' : '竹叶自媒体平台 side panel is not open.',
     });
     const result = await requestNativeHost('ensureCodexAppServer', message.params || {}, message.timeoutMs);
     const status = refreshNativeStatus();
@@ -1426,7 +1426,7 @@ async function waitUrl(url, options = {}) {
 async function runInternalSubscriptionAction(type, payload) {
   const handler = globalThis.__redboxSubscriptionCapture;
   if (typeof handler !== 'function') {
-    throw new Error('Subscription capture runtime is unavailable; reload the RedBox extension');
+    throw new Error('Subscription capture runtime is unavailable; reload the 竹叶自媒体平台æµè§å¨æä»¶');
   }
   return await handler(type, payload);
 }
@@ -4035,7 +4035,7 @@ function researchDownloadStaging(asset = {}, options = {}) {
     extension = asset.type === 'video' ? 'mp4' : asset.type === 'audio' ? 'bin' : 'jpg';
   }
   return {
-    filename: `RedBox/research/${runId}/${mediaId}.${extension}`,
+    filename: `竹叶自媒体平台/research/${runId}/${mediaId}.${extension}`,
     runId,
     mediaId,
   };

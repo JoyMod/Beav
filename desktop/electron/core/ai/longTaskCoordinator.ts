@@ -775,7 +775,7 @@ export class LongTaskCoordinator {
       || task.route.recommendedRole;
     const activeRole = getRoleSpec(activeRoleId);
     const systemPrompt = assembleRuntimeSystemPrompt({
-      baseSystemPrompt: options.baseSystemPrompt || '你是 RedBox 的协调执行代理。你接收的是已经过计划和子角色拆解后的任务，必须严格按协作结果执行。',
+      baseSystemPrompt: options.baseSystemPrompt || '你是竹叶自媒体平台的协调执行代理。你接收的是已经过计划和子角色拆解后的任务，必须严格按协作结果执行。',
       runtimeMode: task.runtimeMode,
       route: task.route,
       role: activeRole,

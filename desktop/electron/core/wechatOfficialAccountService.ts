@@ -42,7 +42,7 @@ interface ResolvedAsset {
 }
 
 const STORE_FILE_NAME = 'wechat-official-accounts.json';
-const DEFAULT_AUTHOR = 'RedBox';
+const DEFAULT_AUTHOR = '竹叶自媒体平台';
 const MAX_TITLE_CHARS = 64;
 const MAX_AUTHOR_CHARS = 16;
 const MAX_DIGEST_CHARS = 120;

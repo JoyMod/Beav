@@ -102,7 +102,7 @@ export function useAppUpdateNotice(openDownloadFailedLabel: string) {
         currentVersion: version,
         latestVersion: version,
         htmlUrl: '',
-        name: `RedBox v${version}`,
+        name: `竹叶自媒体平台 v${version}`,
         publishedAt: '2026-05-14',
         body: currentReleaseNotesMarkdown(),
         mode: 'current',

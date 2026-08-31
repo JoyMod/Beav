@@ -10,7 +10,7 @@ export interface OfficialAiPanelModule {
   tabLabel?: string;
 }
 
-export const hasOfficialAiPanel = true;
+export const hasOfficialAiPanel = false;
 export const officialAiPanelTabLabel = '官方账号';
 
 export const loadOfficialAiPanelModule = async (): Promise<OfficialAiPanelModule | null> => {

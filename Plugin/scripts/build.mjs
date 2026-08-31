@@ -72,5 +72,5 @@ await Promise.all(scriptEntries.map((entry) => build({
 })));
 
 const outputFiles = await readdir(outputDir);
-console.log(`Built Beav extension into ${path.relative(pluginRoot, outputDir)}`);
+console.log(`Built 竹叶自媒体平台 extension into ${path.relative(pluginRoot, outputDir)}`);
 console.log(`Output entries: ${outputFiles.sort().join(', ')}`);

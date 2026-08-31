@@ -896,8 +896,8 @@ function ensureDragDropUi() {
         }
       </style>
 	      <div class="zone" data-visible="false" data-state="idle">
-	        <div class="eyebrow">Beav</div>
-	        <div class="title">保存图片到 Beav</div>
+	        <div class="eyebrow">竹叶自媒体平台</div>
+	        <div class="title">保存图片到 竹叶自媒体平台</div>
 	        <div class="meta">松手后会直接保存到素材库，并保留来源域名与原页面链接。</div>
 	      </div>
 	    `;
@@ -919,7 +919,7 @@ function setDragZoneState(state, payload, message) {
     ensureDragDropUi();
     if (!dragOverlayHost || !dragZoneElement || !dragZoneTitleElement || !dragZoneMetaElement) return;
 
-    const title = normalizeText(payload?.title) || '保存图片到 Beav';
+    const title = normalizeText(payload?.title) || '保存图片到 竹叶自媒体平台';
     dragOverlayHost.style.display = 'block';
     dragZoneElement.dataset.visible = 'true';
     dragZoneElement.dataset.state = state;
@@ -940,7 +940,7 @@ function setDragZoneState(state, payload, message) {
         return;
     }
 
-    dragZoneTitleElement.textContent = '保存图片到 Beav';
+    dragZoneTitleElement.textContent = '保存图片到 竹叶自媒体平台';
     dragZoneMetaElement.textContent = message || title;
 }
 
@@ -1159,7 +1159,7 @@ function summarizeActionResponse(response, fallback) {
         if (response.duplicate) {
             return response.updated ? '知识库中已存在，已更新' : '知识库中已存在';
         }
-        return '已保存到 Beav';
+        return '已保存到 竹叶自媒体平台';
     }
     if (response?.mode === 'xhs-link-batch') {
         return `成功 ${Number(response.count || 0)} 条，失败 ${Number(response.failed || 0)} 条`;
@@ -1220,7 +1220,7 @@ async function ensurePlatformSaveSafetyNotice(action) {
 async function runXhsDomAction(action, options = {}) {
     if (!USER_PROFILE_FEATURE_ENABLED && (action === 'blogger' || action === 'bloggerNotes')) return;
     const actionMap = {
-        save: { type: 'save-xhs', pending: '保存中...', done: '已保存到 Beav' },
+        save: { type: 'save-xhs', pending: '保存中...', done: '已保存到 竹叶自媒体平台' },
         download: { type: 'xhs:download-current-note', pending: '下载中...', done: '已创建下载任务' },
         downloadZip: { type: 'xhs:download-current-note-zip', pending: '打包中...', done: '已创建压缩包下载' },
         comments: { type: 'xhs:collect-current-comments', pending: '采集中...', done: '评论已写入知识库' },
@@ -1228,8 +1228,8 @@ async function runXhsDomAction(action, options = {}) {
         bloggerNotes: { type: 'xhs:collect-blogger-notes', pending: '采集中...', done: '已采集主页笔记' },
         exportJson: { type: 'xhs:export-current-note-json', pending: '导出中...', done: '已导出 JSON' },
         collectLink: { type: 'xhs:collect-note-links', pending: '采集中...', done: '已采集' },
-        savePageAuto: { type: 'save-page-auto', pending: '保存中...', done: '已保存到 Beav' },
-        savePageLink: { type: 'save-page-link', pending: '保存中...', done: '已保存到 Beav' },
+        savePageAuto: { type: 'save-page-auto', pending: '保存中...', done: '已保存到 竹叶自媒体平台' },
+        savePageLink: { type: 'save-page-link', pending: '保存中...', done: '已保存到 竹叶自媒体平台' },
         saveYoutube: { type: 'save-youtube', pending: '保存中...', done: '已保存 YouTube 视频' },
         saveDouyin: { type: 'save-douyin', pending: '保存中...', done: '已保存抖音视频' },
         saveZhihuAnswer: { type: 'save-zhihu-answer', pending: '保存中...', done: '已保存知乎回答' },
@@ -1576,7 +1576,7 @@ function createXhsDetailHost(injectionKey) {
     saveButton.type = 'button';
     saveButton.dataset.redboxAction = 'save';
     saveButton.textContent = '保存笔记';
-    saveButton.title = '保存当前小红书笔记到 Beav';
+    saveButton.title = '保存当前小红书笔记到 竹叶自媒体平台';
     const zipButton = document.createElement('button');
     zipButton.type = 'button';
     zipButton.dataset.redboxAction = 'downloadZip';
@@ -1682,7 +1682,7 @@ function injectXhsProfileActions() {
     status.className = 'redbox-xhs-status';
     status.hidden = true;
     if (ACCOUNT_BINDING_FEATURE_ENABLED) {
-        container.append(makeXhsDomButton('保存博主', 'blogger', { primary: true, statusTarget: container, title: '保存当前小红书博主资料到 Beav' }));
+        container.append(makeXhsDomButton('保存博主', 'blogger', { primary: true, statusTarget: container, title: '保存当前小红书博主资料到 竹叶自媒体平台' }));
     }
     container.append(
         makeXhsDomButton('采集博主笔记', 'bloggerNotes', { primary: !ACCOUNT_BINDING_FEATURE_ENABLED, statusTarget: container, title: '采集当前博主主页全部可加载笔记' }),
@@ -1742,7 +1742,7 @@ function injectXhsCardButtons() {
         button.type = 'button';
         button.className = 'redbox-xhs-card-btn';
         button.textContent = '采集';
-        button.title = '采集这条小红书笔记到 Beav';
+        button.title = '采集这条小红书笔记到 竹叶自媒体平台';
         const status = document.createElement('span');
         status.className = 'redbox-xhs-card-status redbox-xhs-status';
         status.hidden = true;

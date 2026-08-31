@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
-import { app } from 'electron';
+import { app, safeStorage } from 'electron';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { resolveAssetSourceToPath } from './core/localAssetManager';
@@ -62,6 +62,43 @@ const DEFAULT_SPACE_NAME = '默认空间';
 const DEFAULT_CHAT_MAX_TOKENS = 262144;
 const DEFAULT_CHAT_MAX_TOKENS_DEEPSEEK = 131072;
 const MIN_CHAT_MAX_TOKENS = 1024;
+const SAFE_STORAGE_PREFIX = 'safe-storage:v1:';
+
+const encryptSecret = (value: unknown): string => {
+  const plaintext = String(value || '').trim();
+  if (!plaintext || plaintext.startsWith(SAFE_STORAGE_PREFIX)) return plaintext;
+  if (!app.isReady() || !safeStorage.isEncryptionAvailable()) {
+    throw new Error('系统安全存储不可用，API Key 未保存。');
+  }
+  return `${SAFE_STORAGE_PREFIX}${safeStorage.encryptString(plaintext).toString('base64')}`;
+};
+
+const decryptSecret = (value: unknown): string => {
+  const stored = String(value || '').trim();
+  if (!stored.startsWith(SAFE_STORAGE_PREFIX)) return stored;
+  if (!app.isReady() || !safeStorage.isEncryptionAvailable()) return '';
+  try {
+    return safeStorage.decryptString(Buffer.from(stored.slice(SAFE_STORAGE_PREFIX.length), 'base64'));
+  } catch {
+    return '';
+  }
+};
+
+const transformAiSourceSecrets = (raw: unknown, transform: (value: unknown) => string): string => {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+  try {
+    const sources = JSON.parse(value);
+    if (!Array.isArray(sources)) return value;
+    return JSON.stringify(sources.map((source) => (
+      source && typeof source === 'object'
+        ? { ...source, apiKey: transform((source as { apiKey?: unknown }).apiKey) }
+        : source
+    )));
+  } catch {
+    return value;
+  }
+};
 
 const normalizeChatMaxTokens = (value: unknown, fallback: number): number => {
   const parsed = Number(value);
@@ -105,6 +142,7 @@ const initDb = () => {
       transcription_endpoint TEXT,
       transcription_key TEXT,
       ai_sources_json TEXT,
+      ai_model_routes_json TEXT,
       default_ai_source_id TEXT,
       image_provider TEXT,
       image_endpoint TEXT,
@@ -421,6 +459,9 @@ const initDb = () => {
     db.exec(`ALTER TABLE settings ADD COLUMN ai_sources_json TEXT;`);
   } catch { /* Column already exists */ }
   try {
+    db.exec(`ALTER TABLE settings ADD COLUMN ai_model_routes_json TEXT;`);
+  } catch { /* Column already exists */ }
+  try {
     db.exec(`ALTER TABLE settings ADD COLUMN default_ai_source_id TEXT;`);
   } catch { /* Column already exists */ }
 
@@ -674,6 +715,7 @@ export const saveSettings = (settings: {
   embedding_key?: string;
   embedding_model?: string;
   ai_sources_json?: string;
+  ai_model_routes_json?: string;
   default_ai_source_id?: string;
   image_provider?: string;
   image_endpoint?: string;
@@ -697,8 +739,8 @@ export const saveSettings = (settings: {
   chat_max_tokens_deepseek?: number;
 }) => {
   const stmt = db.prepare(`
-    INSERT INTO settings (id, api_endpoint, api_key, model_name, model_name_wander, model_name_chatroom, model_name_knowledge, model_name_redclaw, search_provider, search_endpoint, search_api_key, proxy_enabled, proxy_url, proxy_bypass, role_mapping, workspace_dir, active_space_id, transcription_model, transcription_endpoint, transcription_key, embedding_endpoint, embedding_key, embedding_model, ai_sources_json, default_ai_source_id, image_provider, image_endpoint, image_api_key, image_model, video_endpoint, video_api_key, video_model, image_provider_template, image_aspect_ratio, image_size, image_quality, mcp_servers_json, ecommerce_platforms_json, redclaw_compact_target_tokens, wander_deep_think_enabled, debug_log_enabled, developer_mode_enabled, developer_mode_unlocked_at, chat_max_tokens_default, chat_max_tokens_deepseek)
-    VALUES (1, @api_endpoint, @api_key, @model_name, @model_name_wander, @model_name_chatroom, @model_name_knowledge, @model_name_redclaw, @search_provider, @search_endpoint, @search_api_key, @proxy_enabled, @proxy_url, @proxy_bypass, @role_mapping, @workspace_dir, @active_space_id, @transcription_model, @transcription_endpoint, @transcription_key, @embedding_endpoint, @embedding_key, @embedding_model, @ai_sources_json, @default_ai_source_id, @image_provider, @image_endpoint, @image_api_key, @image_model, @video_endpoint, @video_api_key, @video_model, @image_provider_template, @image_aspect_ratio, @image_size, @image_quality, @mcp_servers_json, @ecommerce_platforms_json, @redclaw_compact_target_tokens, @wander_deep_think_enabled, @debug_log_enabled, @developer_mode_enabled, @developer_mode_unlocked_at, @chat_max_tokens_default, @chat_max_tokens_deepseek)
+    INSERT INTO settings (id, api_endpoint, api_key, model_name, model_name_wander, model_name_chatroom, model_name_knowledge, model_name_redclaw, search_provider, search_endpoint, search_api_key, proxy_enabled, proxy_url, proxy_bypass, role_mapping, workspace_dir, active_space_id, transcription_model, transcription_endpoint, transcription_key, embedding_endpoint, embedding_key, embedding_model, ai_sources_json, ai_model_routes_json, default_ai_source_id, image_provider, image_endpoint, image_api_key, image_model, video_endpoint, video_api_key, video_model, image_provider_template, image_aspect_ratio, image_size, image_quality, mcp_servers_json, ecommerce_platforms_json, redclaw_compact_target_tokens, wander_deep_think_enabled, debug_log_enabled, developer_mode_enabled, developer_mode_unlocked_at, chat_max_tokens_default, chat_max_tokens_deepseek)
+    VALUES (1, @api_endpoint, @api_key, @model_name, @model_name_wander, @model_name_chatroom, @model_name_knowledge, @model_name_redclaw, @search_provider, @search_endpoint, @search_api_key, @proxy_enabled, @proxy_url, @proxy_bypass, @role_mapping, @workspace_dir, @active_space_id, @transcription_model, @transcription_endpoint, @transcription_key, @embedding_endpoint, @embedding_key, @embedding_model, @ai_sources_json, @ai_model_routes_json, @default_ai_source_id, @image_provider, @image_endpoint, @image_api_key, @image_model, @video_endpoint, @video_api_key, @video_model, @image_provider_template, @image_aspect_ratio, @image_size, @image_quality, @mcp_servers_json, @ecommerce_platforms_json, @redclaw_compact_target_tokens, @wander_deep_think_enabled, @debug_log_enabled, @developer_mode_enabled, @developer_mode_unlocked_at, @chat_max_tokens_default, @chat_max_tokens_deepseek)
     ON CONFLICT(id) DO UPDATE SET
       api_endpoint = @api_endpoint,
       api_key = @api_key,
@@ -723,6 +765,7 @@ export const saveSettings = (settings: {
       embedding_key = @embedding_key,
       embedding_model = @embedding_model,
       ai_sources_json = @ai_sources_json,
+      ai_model_routes_json = @ai_model_routes_json,
       default_ai_source_id = @default_ai_source_id,
       image_provider = @image_provider,
       image_endpoint = @image_endpoint,
@@ -769,6 +812,7 @@ export const saveSettings = (settings: {
     embedding_key?: string;
     embedding_model?: string;
     ai_sources_json?: string;
+    ai_model_routes_json?: string;
     default_ai_source_id?: string;
     image_provider?: string;
     image_endpoint?: string;
@@ -796,9 +840,9 @@ export const saveSettings = (settings: {
     api_endpoint: Object.prototype.hasOwnProperty.call(settings, 'api_endpoint')
       ? String(settings.api_endpoint || '').trim()
       : String(current?.api_endpoint || '').trim(),
-    api_key: Object.prototype.hasOwnProperty.call(settings, 'api_key')
-      ? String(settings.api_key || '').trim()
-      : String(current?.api_key || '').trim(),
+    api_key: encryptSecret(Object.prototype.hasOwnProperty.call(settings, 'api_key')
+      ? settings.api_key
+      : current?.api_key),
     model_name: Object.prototype.hasOwnProperty.call(settings, 'model_name')
       ? String(settings.model_name || '').trim()
       : String(current?.model_name || '').trim(),
@@ -808,7 +852,7 @@ export const saveSettings = (settings: {
     model_name_redclaw: String(settings.model_name_redclaw ?? current?.model_name_redclaw ?? '').trim(),
     search_provider: String(settings.search_provider ?? current?.search_provider ?? 'duckduckgo').trim() || 'duckduckgo',
     search_endpoint: String(settings.search_endpoint ?? current?.search_endpoint ?? '').trim(),
-    search_api_key: String(settings.search_api_key ?? current?.search_api_key ?? '').trim(),
+    search_api_key: encryptSecret(settings.search_api_key ?? current?.search_api_key),
     proxy_enabled: settings.proxy_enabled === undefined
       ? (current?.proxy_enabled ? 1 : 0)
       : (settings.proxy_enabled ? 1 : 0),
@@ -823,18 +867,19 @@ export const saveSettings = (settings: {
     active_space_id: settings.active_space_id || current?.active_space_id || DEFAULT_SPACE_ID,
     transcription_model: settings.transcription_model ?? current?.transcription_model ?? '',
     transcription_endpoint: settings.transcription_endpoint ?? current?.transcription_endpoint ?? '',
-    transcription_key: settings.transcription_key ?? current?.transcription_key ?? '',
+    transcription_key: encryptSecret(settings.transcription_key ?? current?.transcription_key),
     embedding_endpoint: settings.embedding_endpoint ?? current?.embedding_endpoint ?? '',
-    embedding_key: settings.embedding_key ?? current?.embedding_key ?? '',
+    embedding_key: encryptSecret(settings.embedding_key ?? current?.embedding_key),
     embedding_model: settings.embedding_model ?? current?.embedding_model ?? '',
-    ai_sources_json: settings.ai_sources_json ?? current?.ai_sources_json ?? '',
+    ai_sources_json: transformAiSourceSecrets(settings.ai_sources_json ?? current?.ai_sources_json, encryptSecret),
+    ai_model_routes_json: settings.ai_model_routes_json ?? current?.ai_model_routes_json ?? '',
     default_ai_source_id: settings.default_ai_source_id ?? current?.default_ai_source_id ?? '',
     image_provider: settings.image_provider ?? current?.image_provider ?? '',
     image_endpoint: settings.image_endpoint ?? current?.image_endpoint ?? '',
-    image_api_key: settings.image_api_key ?? current?.image_api_key ?? '',
+    image_api_key: encryptSecret(settings.image_api_key ?? current?.image_api_key),
     image_model: settings.image_model ?? current?.image_model ?? '',
     video_endpoint: settings.video_endpoint ?? current?.video_endpoint ?? '',
-    video_api_key: settings.video_api_key ?? current?.video_api_key ?? '',
+    video_api_key: encryptSecret(settings.video_api_key ?? current?.video_api_key),
     video_model: settings.video_model ?? current?.video_model ?? '',
     image_provider_template: settings.image_provider_template ?? current?.image_provider_template ?? '',
     image_aspect_ratio: settings.image_aspect_ratio ?? current?.image_aspect_ratio ?? '',
@@ -896,6 +941,7 @@ export const getSettings = () => {
     embedding_key?: string;
     embedding_model?: string;
     ai_sources_json?: string;
+    ai_model_routes_json?: string;
     default_ai_source_id?: string;
     image_provider?: string;
     image_endpoint?: string;
@@ -967,6 +1013,13 @@ export const getSettings = () => {
     `).run(result.chat_max_tokens_default, result.chat_max_tokens_deepseek);
   }
   if (result) {
+    result.api_key = decryptSecret(result.api_key);
+    result.search_api_key = decryptSecret(result.search_api_key);
+    result.transcription_key = decryptSecret(result.transcription_key);
+    result.embedding_key = decryptSecret(result.embedding_key);
+    result.ai_sources_json = transformAiSourceSecrets(result.ai_sources_json, decryptSecret);
+    result.image_api_key = decryptSecret(result.image_api_key);
+    result.video_api_key = decryptSecret(result.video_api_key);
     (result as { wander_deep_think_enabled?: boolean }).wander_deep_think_enabled = Boolean(result.wander_deep_think_enabled);
     (result as { debug_log_enabled?: boolean }).debug_log_enabled = Boolean(result.debug_log_enabled);
     (result as { developer_mode_enabled?: boolean }).developer_mode_enabled = Boolean(result.developer_mode_enabled);

@@ -165,7 +165,7 @@ function discoverInstalledExtensions(targets) {
           const sourceMatches = sourcePath && extensionSourceRoots.includes(path.resolve(sourcePath));
           const name = typeof manifest.name === 'string' ? manifest.name : '';
           const description = typeof manifest.description === 'string' ? manifest.description : '';
-          const nameMatches = /Beav|RedBox|RedConvert/i.test(`${name}\n${description}`);
+          const nameMatches = /竹叶自媒体平台|Beav|RedBox|RedConvert/i.test(`${name}\n${description}`);
           const extensionId = normalizeExtensionId(id);
           if (!extensionId || (!sourceMatches && !nameMatches)) continue;
           matches.push({
@@ -277,7 +277,7 @@ function installLauncher(nodePath, dryRun, explicitHostPath = '') {
     return { path: hostPath, node: '', hostScript: '', installed: false, source: 'explicit_host' };
   }
   if (process.platform === 'win32') {
-    throw new Error('Windows requires --host-path <desktop executable>; packaged Beav installs the native host automatically.');
+    throw new Error('Windows requires --host-path <desktop executable>; packaged 竹叶自媒体平台 installs the native host automatically.');
   }
   if (!dryRun) {
     fs.mkdirSync(path.dirname(launcherPath), { recursive: true });

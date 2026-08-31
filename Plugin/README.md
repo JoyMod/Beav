@@ -1,6 +1,6 @@
-# Beav Chrome 插件
+# 竹叶自媒体平台 Chrome 插件
 
-这个目录提供 Beav 的工程化构建源码，用来把外部网页内容采集到 Beav 桌面端知识库和素材库。
+这个目录提供 竹叶自媒体平台 的工程化构建源码，用来把外部网页内容采集到 竹叶自媒体平台 桌面端知识库和素材库。
 
 ## 当前支持
 
@@ -26,7 +26,7 @@
 - 任意网页选中文字摘录（右键菜单）
 - 自动检查插件更新
 - AI 浏览器控制：tab/session、DOM snapshot、selector 查询、点击、输入、滚动、截图、CDP、下载状态、页面资产读取
-- MCP / native host 控制面：`App AI -> Desktop Bridge -> Beav Native Host -> Chrome extension -> page`
+- MCP / native host 控制面：`App AI -> Desktop Bridge -> 竹叶自媒体平台 Native Host -> Chrome extension -> page`
 
 ## 加载方式
 
@@ -55,10 +55,10 @@ pnpm verify
 
 - 现有采集：`pageObserver.js`、`xhsBridge.js`、`captureRuntime.js` 保持 content script 常驻，用于小红书、多平台识别、右键保存和网页浮动面板。
 - AI 控制：`browserControlContent.js` 只在 AI 调用浏览器工具时动态注入。
-- native host：正式桌面端启动时会把 Chrome / Edge / Brave 的 Native Messaging manifest 对账到当前 Beav 可执行文件。浏览器启动同一签名应用的隐藏 Native Host 模式，Host 通过 Windows Named Pipe 或 Unix Domain Socket 连接 Desktop Bridge，不监听 TCP 端口。`native-host/host.mjs` 和 Node installer 只保留隔离的 legacy 传输测试。
+- native host：正式桌面端启动时会把 Chrome / Edge / Brave 的 Native Messaging manifest 对账到当前 竹叶自媒体平台 可执行文件。浏览器启动同一签名应用的隐藏 Native Host 模式，Host 通过 Windows Named Pipe 或 Unix Domain Socket 连接 Desktop Bridge，不监听 TCP 端口。`native-host/host.mjs` 和 Node installer 只保留隔离的 legacy 传输测试。
 - Knowledge / Accounts：插件的保存、查询和账号导入请求均通过 Native Messaging 交给 Desktop Bridge 的 typed allowlist；Host 不代理 HTTP，也不直接写本地业务数据。
 - 自动诊断：连接状态变化、App 未启动、Native Host 重连、用户取消、页面不适用和策略拒绝只保留在本地有界遥测中，不创建反馈工单。只有用户操作产生的非预期终态失败，或不可重试的协议、鉴权、数据完整性错误，才由插件直接提交到公开反馈接口；同一安装上的同一业务操作错误 24 小时最多提交一次，task/message 两层按同一语义合并。用于聚合的安装标识只在本地由随机实例 ID 派生为不可逆短哈希，原始 ID 不会上传。网络不可用时进入插件本地有界队列并自动重试，不依赖 Desktop Bridge。仅保留错误码、阶段、版本、浏览器和站点 origin 等定位元数据，不上传网页正文、Cookie、Token 或完整 URL。
-- App 内置 MCP：桌面端启动时会自动注册 `Beav Browser Control` MCP server，stdio command 指向 Beav App 自身的隐藏兼容 `--redbox-browser-control-mcp` 模式，不要求用户手动导入 MCP 配置。
+- App 内置 MCP：桌面端启动时会自动注册 `竹叶自媒体平台 Browser Control` MCP server，stdio command 指向 竹叶自媒体平台 App 自身的隐藏兼容 `--redbox-browser-control-mcp` 模式，不要求用户手动导入 MCP 配置。
 - App AI 首选入口：模型使用 `browser.connection.status/repair`、`browser.tabs.list`、`browser.tab.open/claim`、`browser.page.inspect/click/type`、`browser.tabs.finalize` 等单一职责 typed action。旧 `browser.control` 只做历史 session 兼容；MCP / Native Host 是后端适配层，不作为普通任务的模型调用面。
 - Agent-side JS client：`scripts/browser-client.mjs` 提供 Codex 同款对象 facade；生产型调试使用 `DesktopBridgeBrowserTransport`，旧 `BrowserControlTransport` 只服务隔离的 legacy contract tests。
 - 开发 MCP server：`mcp-server.mjs` 保留给插件目录独立调试，负责把 `tools/list` / `tools/call` 转发到当前 Desktop Bridge。
@@ -93,10 +93,10 @@ pnpm agent:call -- --method tools/list
 
 验收边界：
 
-- “打开网页读取内容”不是浏览器控制验收；必须看到 Beav MCP / Native Host 经真实 Chrome 扩展返回 `tools/list`、`tabs.list`、`tab.info`、DOM 查询和至少一个交互动作。
+- “打开网页读取内容”不是浏览器控制验收；必须看到 竹叶自媒体平台 MCP / Native Host 经真实 Chrome 扩展返回 `tools/list`、`tabs.list`、`tab.info`、DOM 查询和至少一个交互动作。
 - `pnpm smoke:browser-control` 使用临时 profile / Chromium 做回归，不代表用户真实 Chrome 可用。
-- 真实 Chrome 验收必须使用已安装的 Beav 扩展、真实 Chrome Native Messaging manifest、真实 Desktop Bridge，以及真实标签页或受控测试标签页。
-- 被 `tab.claim` / `tab.create` 纳入 active browser session 的页面必须显示 `Beav 控制中` 页面内标签；释放、finalize 或 turn 结束后自动移除。
+- 真实 Chrome 验收必须使用已安装的 竹叶自媒体平台 扩展、真实 Chrome Native Messaging manifest、真实 Desktop Bridge，以及真实标签页或受控测试标签页。
+- 被 `tab.claim` / `tab.create` 纳入 active browser session 的页面必须显示 `竹叶自媒体平台 控制中` 页面内标签；释放、finalize 或 turn 结束后自动移除。
 - 不要为 smoke 或调试授权 macOS login keychain / Chrome Safe Storage；如果弹出此类提示，应拒绝并改用隔离 profile。
 
 ## 开发命令
@@ -114,34 +114,34 @@ pnpm package
 
 - `pnpm build`：把 `src` 里的 manifest、HTML、CSS、图片和脚本构建到 `dist/extension`。
 - `pnpm verify`：检查 manifest、HTML 引用、动态注入脚本和关键 content script 合同。
-- `scripts/browser-client.mjs`：供 agent / 调试脚本按 Codex Browser Use 对象 API 使用 Beav browser-control；配套文档在 [Plugin/docs/browser-runtime.md](/Users/Jam/LocalDev/GitHub/RedConvert/Plugin/docs/browser-runtime.md)。
+- `scripts/browser-client.mjs`：供 agent / 调试脚本按 Codex Browser Use 对象 API 使用 竹叶自媒体平台 browser-control；配套文档在 [Plugin/docs/browser-runtime.md](/Users/Jam/LocalDev/GitHub/RedConvert/Plugin/docs/browser-runtime.md)。
 - `pnpm install:native-host`：安装 Chrome native messaging host manifest。
 - `pnpm diagnose:browser-control`：检查 Native Host manifest、Desktop Bridge descriptor、鉴权握手和 extension forwarding 状态；需要只取报告时加 `-- --no-fail`。
 - `pnpm smoke:browser-control`：在当前运行的 Desktop Bridge 上，用临时 Chrome profile 加载构建后的扩展并临时安装 Native Host manifest，验证握手、tools/list、tab 创建、DOM 读取和 finalize；Host 版本必须与运行中的 App 版本一致。
-- `pnpm mcp:server`：启动开发态 Beav browser-control stdio MCP server；正式 App 使用内置 Rust MCP 入口。
-- `pnpm package`：先构建，再生成 `dist/Beav-<version>.zip`。
+- `pnpm mcp:server`：启动开发态 竹叶自媒体平台 browser-control stdio MCP server；正式 App 使用内置 Rust MCP 入口。
+- `pnpm package`：先构建，再生成 `dist/竹叶自媒体平台-<version>.zip`。
 
 ## 使用前提
 
-- Beav 桌面端必须已经启动。
+- 竹叶自媒体平台 桌面端必须已经启动。
 - Desktop Bridge 必须已启动；插件不需要配置 API 地址或本机端口。
 
 ## 使用方式
 
-- 新安装时，点击浏览器扩展图标会打开 Beav 快捷弹窗；可在设置页切换为侧边栏工作台。升级用户会保留原有侧边栏打开方式。
+- 新安装时，点击浏览器扩展图标会打开 竹叶自媒体平台 快捷弹窗；可在设置页切换为侧边栏工作台。升级用户会保留原有侧边栏打开方式。
 - Popup 适合识别并保存当前页面，可直接打开完整侧边栏工作台；批量采集、任务队列和执行日志在侧边栏中使用。
 - 可在 Popup 的“设置”、扩展详情页的“扩展程序选项”，或侧边栏顶部的设置按钮中切换打开方式。
 - 侧边栏展示当前页面识别、统一任务队列和批量采集入口；详情页采集、下载、导出等轻操作仍通过网页内 DOM 注入按钮触发。
-- 在小红书详情页可使用笔记操作区注入按钮：Beav 保存、下载压缩包、下载素材、采集评论。
+- 在小红书详情页可使用笔记操作区注入按钮：竹叶自媒体平台 保存、下载压缩包、下载素材、采集评论。
 - 小红书博主页可使用浏览器侧边栏或资料区注入按钮采集主页笔记，采集会优先读取 `user_posted`，失败时滚动主页收集已加载出来的笔记链接。
 - 在小红书信息流、搜索页、博主页可点击卡片右上角“采集”按钮保存单条笔记。
 - 批量采集默认串行执行；设置页可调整每条笔记之间的随机采集间隔、博主主页默认条数、关键词默认条数和链接批量上限。
 - 从多个页面、多个侧边栏或 DOM 注入按钮触发的小红书任务会进入同一个后台队列，避免并发采集互相冲突。
 - 博主笔记、链接批量、当前页批量和关键词采集支持在任务队列中暂停、继续或停止；短任务只显示停止。
 - 在 YouTube 视频页打开插件，点击“保存 YouTube 视频”
-- 在任意网页中选中文字，右键点击“保存选中文字到 Beav”
+- 在任意网页中选中文字，右键点击“保存选中文字到 竹叶自媒体平台”
 - 在任意网页点击插件图标，在 Popup 或侧边栏中保存当前页面链接
-- 检测到新版本后，点击“打开更新源”会打开 Beav 下载源，下载插件压缩包后重新加载扩展即可完成更新
+- 检测到新版本后，点击“打开更新源”会打开 竹叶自媒体平台 下载源，下载插件压缩包后重新加载扩展即可完成更新
 
 ## 备注
 

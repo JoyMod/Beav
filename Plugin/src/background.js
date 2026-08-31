@@ -183,7 +183,7 @@ function ensureContextMenus() {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: MENU_ROOT_ID,
-      title: '保存到 Beav',
+      title: '保存到 竹叶自媒体平台',
       contexts: ['page', 'selection', 'link', 'image', 'video'],
     });
     chrome.contextMenus.create({
@@ -2380,8 +2380,8 @@ async function applyUpdateBadge(stateInput) {
   const state = sanitizeUpdateState(stateInput);
   await chrome.action.setBadgeText({ text: '' }).catch(() => {});
   const title = state.hasUpdate
-    ? `Beav：发现新版本 ${state.latestVersion}`
-    : `Beav ${state.currentVersion}`;
+    ? `竹叶自媒体平台：发现新版本 ${state.latestVersion}`
+    : `竹叶自媒体平台 ${state.currentVersion}`;
   await chrome.action.setTitle({ title }).catch(() => {});
 }
 
@@ -2561,7 +2561,7 @@ async function requestDesktopBridgeHost() {
     ? host.desktopBridge
     : null;
   if (!bridge?.connected) {
-    const error = new Error('Beav desktop bridge is not connected');
+    const error = new Error('竹叶自媒体平台 desktop bridge is not connected');
     error.code = normalizeText(bridge?.errorCode)
       || (bridge?.availability === 'bridge_error' ? 'DESKTOP_BRIDGE_ERROR' : 'APP_BRIDGE_UNAVAILABLE');
     error.phase = normalizeText(bridge?.phase) || 'bridge';
@@ -2716,7 +2716,7 @@ function knowledgeNativeMethod(path, method) {
   };
   const nativeMethod = methods[key];
   if (!nativeMethod) {
-    throw new Error(`不支持的 Beav Desktop action: ${key}`);
+    throw new Error(`不支持的 竹叶自媒体平台 Desktop action: ${key}`);
   }
   return nativeMethod;
 }
@@ -5012,7 +5012,7 @@ function buildXhsDownloadItems(payload) {
     items.push({
       type,
       url,
-      filename: `Beav/xhs/${noteId}-${title}-${String(index).padStart(2, '0')}.${ext}`,
+      filename: `竹叶自媒体平台/xhs/${noteId}-${title}-${String(index).padStart(2, '0')}.${ext}`,
     });
   }
 
@@ -5177,7 +5177,7 @@ function arrayBufferToBase64(buffer) {
 }
 
 function stripZipEntryPrefix(filename) {
-  return normalizeText(filename).replace(/^(?:Beav|RedBox)\/xhs\//i, '') || 'xhs-media';
+  return normalizeText(filename).replace(/^(?:竹叶自媒体平台|Beav|RedBox)\/xhs\//i, '') || 'xhs-media';
 }
 
 function dataUrlToBytes(dataUrl) {
@@ -5287,7 +5287,7 @@ async function downloadXhsMediaZipFromTab(tabId) {
   const zipBytes = buildStoredZip(entries);
   const title = sanitizeFilenamePart(payload?.title || payload?.noteId || 'xhs-note', 'xhs-note');
   const noteId = sanitizeFilenamePart(payload?.noteId || hashString(payload?.source || title), 'note');
-  const filename = `Beav/xhs/${noteId}-${title}.zip`;
+  const filename = `竹叶自媒体平台/xhs/${noteId}-${title}.zip`;
   const dataUrl = `data:application/zip;base64,${arrayBufferToBase64(zipBytes)}`;
   const downloadId = await downloadBrowserFile(dataUrl, filename);
   const historyItem = await appendXhsTaskHistory({
@@ -6556,7 +6556,7 @@ async function exportCurrentXhsNoteJson(tabId) {
   const noteId = sanitizeFilenamePart(payload?.noteId || hashString(payload?.source || title), 'note');
   const json = JSON.stringify(payload, null, 2);
   const dataUrl = `data:application/json;charset=utf-8,${encodeURIComponent(json)}`;
-  const filename = `Beav/xhs/${noteId}-${title}.json`;
+  const filename = `竹叶自媒体平台/xhs/${noteId}-${title}.json`;
   const downloadId = await downloadBrowserFile(dataUrl, filename);
   await appendXhsTaskHistory({
     id: `xhs-export-${hashString(`${payload?.source || ''}-${Date.now()}`)}`,
@@ -8282,7 +8282,7 @@ async function extractXhsNotePayload() {
 async function extractXhsCommentsPayload() {
   const capture = window.__REDBOX_CAPTURE_RUNTIME__;
   if (!capture) {
-    throw new Error('Beav capture runtime 未加载');
+    throw new Error('竹叶自媒体平台 capture runtime 未加载');
   }
   const {
     normalizeText,

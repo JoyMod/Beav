@@ -4,20 +4,14 @@ import { AppDialogsHost } from './components/AppDialogsHost';
 import { Layout } from './components/Layout';
 import { AppOnboarding, getAppAcquisitionSource, hasSeenAppOnboarding, markAppOnboardingSeen } from './components/AppOnboarding';
 import { FeedbackReportDialog } from './components/FeedbackReportDialog';
-import { useLlmReadinessLifecycle } from './hooks/useLlmReadinessLifecycle';
-import { useLlmReadinessState } from './hooks/useLlmReadinessState';
-import { useOfficialAuthLifecycle } from './hooks/useOfficialAuthLifecycle';
-import { useOfficialAuthState } from './hooks/useOfficialAuthState';
 import { NotificationsHost } from './notifications/NotificationsHost';
 import { useI18n } from './i18n';
-import { OfficialLoginGate } from './features/app-shell/OfficialLoginGate';
 import { AppSubjectsModal } from './features/app-shell/AppSubjectsModal';
 import { StartupMigrationGate } from './features/app-shell/StartupMigrationGate';
 import { useExecutionPersistence } from './features/app-shell/useExecutionPersistence';
 import { useFeedbackReportDialog } from './features/app-shell/useFeedbackReportDialog';
 import { useGenerationShellNavigation } from './features/app-shell/useGenerationShellNavigation';
 import { useGlobalIntentRouter } from './features/app-shell/useGlobalIntentRouter';
-import { useOfficialAuthNotice } from './features/app-shell/useOfficialAuthNotice';
 import { useRedClawShellNavigation } from './features/app-shell/useRedClawShellNavigation';
 import { useSettingsShellNavigation } from './features/app-shell/useSettingsShellNavigation';
 import { useSubjectsModal } from './features/app-shell/useSubjectsModal';
@@ -71,7 +65,6 @@ function AuthenticatedApp({ onOpenAppOnboarding }: { onOpenAppOnboarding: () => 
   const [knowledgeTitleBarContent, setKnowledgeTitleBarContent] = useState<ReactNode>(null);
   const [approvalTargetDocketId, setApprovalTargetDocketId] = useState('');
 
-  const globalAuthNotice = useOfficialAuthNotice();
   const {
     subjectsModalOpen,
     openSubjectsModal,
@@ -165,7 +158,7 @@ function AuthenticatedApp({ onOpenAppOnboarding }: { onOpenAppOnboarding: () => 
         onNavigate={navigateToView}
         immersiveMode={effectiveImmersiveMode}
         hideGlobalSidebar={currentView === 'settings'}
-        globalNotice={globalAuthNotice}
+        globalNotice={null}
         globalSidebarContent={redClawGlobalSidebarContent}
         activeModalView={subjectsModalOpen ? 'subjects' : undefined}
         renderTitleBarContent={({ currentView }) => {
@@ -374,24 +367,7 @@ function AuthenticatedApp({ onOpenAppOnboarding }: { onOpenAppOnboarding: () => 
 }
 
 function App() {
-  useOfficialAuthLifecycle();
-  useLlmReadinessLifecycle();
-  const { snapshot: officialAuthState, bootstrapped: officialAuthBootstrapped } = useOfficialAuthState();
-  const { snapshot: llmReadinessState, bootstrapped: llmReadinessBootstrapped } = useLlmReadinessState();
   const [appOnboardingOpen, setAppOnboardingOpen] = useState(false);
-  const officialAuthStatus = String(officialAuthState?.status || '').trim();
-  const officialAuthPending = !officialAuthBootstrapped
-    || officialAuthStatus === 'restoring'
-    || officialAuthStatus === 'refreshing';
-  const officialAuthLoggedIn = officialAuthBootstrapped
-    && officialAuthStatus !== 'anonymous'
-    && officialAuthStatus !== 'reauthRequired'
-    && officialAuthStatus !== 'restoring'
-    && Boolean(officialAuthState?.loggedIn);
-  const officialAuthNeedsLogin = officialAuthBootstrapped
-    && !officialAuthPending
-    && !officialAuthLoggedIn;
-  const llmReadinessPending = officialAuthLoggedIn && !llmReadinessBootstrapped;
 
   const openAppOnboarding = useCallback(() => {
     setAppOnboardingOpen(true);
@@ -407,42 +383,6 @@ function App() {
       setAppOnboardingOpen(true);
     }
   }, []);
-
-  if (officialAuthPending) {
-    return (
-      <>
-        <OfficialLoginGate mode="checking" />
-        <AppOnboarding open={appOnboardingOpen} onClose={closeAppOnboarding} />
-      </>
-    );
-  }
-
-  if (officialAuthNeedsLogin) {
-    return (
-      <>
-        <OfficialLoginGate mode={officialAuthStatus === 'reauthRequired' ? 'expired' : 'login'} />
-        <AppOnboarding open={appOnboardingOpen} onClose={closeAppOnboarding} />
-      </>
-    );
-  }
-
-  if (llmReadinessPending) {
-    return (
-      <>
-        <OfficialLoginGate mode="checking" />
-        <AppOnboarding open={appOnboardingOpen} onClose={closeAppOnboarding} />
-      </>
-    );
-  }
-
-  if (!llmReadinessState?.ready) {
-    return (
-      <>
-        <OfficialLoginGate mode={officialAuthStatus === 'reauthRequired' ? 'expired' : 'login'} />
-        <AppOnboarding open={appOnboardingOpen} onClose={closeAppOnboarding} />
-      </>
-    );
-  }
 
   return (
     <>

@@ -959,7 +959,7 @@ function SceneLayerContent({
                         fontWeight: 600,
                     }}
                 >
-                    {scene.overlayTitle || 'RedBox Motion Scene'}
+                    {scene.overlayTitle || '竹叶自媒体平台动态场景'}
                 </AbsoluteFill>
             ) : null}
             {entities.map((entity) => (

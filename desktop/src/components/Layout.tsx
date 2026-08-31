@@ -18,7 +18,7 @@ import { useLayoutSpaces } from '../features/app-shell/useLayoutSpaces';
 import { useLayoutTheme } from '../features/app-shell/useLayoutTheme';
 import { ENTITLEMENTS } from '../features/membership/entitlementKeys';
 import { useMembership } from '../features/membership/useMembership';
-import { asRecord, resolveFounderSponsorState, valueContainsFounder } from '../utils/membership';
+import { asRecord, valueContainsFounder } from '../utils/membership';
 
 interface LayoutProps {
   children: ReactNode;
@@ -261,8 +261,7 @@ function formatPointsBalance(points: number | null): string {
 
 export function Layout({ children, currentView, onNavigate, immersiveMode = false, hideGlobalSidebar = false, globalNotice = null, globalSidebarContent, activeModalView, renderTitleBarContent, renderTitleBarActions }: LayoutProps) {
   const { t } = useI18n();
-  const { snapshot: officialAuthSnapshot, can: canUseMembershipEntitlement } = useMembership();
-  const [founderSponsorOpen, setFounderSponsorOpen] = useState(false);
+  const { can: canUseMembershipEntitlement } = useMembership();
   const notificationDrawerOpen = useNotificationStore((state) => state.drawerOpen);
   const toggleNotificationDrawer = useNotificationStore((state) => state.toggleDrawer);
   const unreadNotificationCount = useNotificationStore(selectNotificationUnreadCount);
@@ -281,10 +280,6 @@ export function Layout({ children, currentView, onNavigate, immersiveMode = fals
     toggleSidebarCollapsed,
     startSidebarResize,
   } = useLayoutSidebar();
-  const founderSponsorState = useMemo(
-    () => resolveFounderSponsorState(officialAuthSnapshot),
-    [officialAuthSnapshot],
-  );
   const {
     spaces,
     activeSpaceId,
@@ -309,7 +304,7 @@ export function Layout({ children, currentView, onNavigate, immersiveMode = fals
     submitSpaceDialog,
   } = useLayoutSpaces(sidebarVisualCollapsed, {
     canCreateSpace: canUseMembershipEntitlement(ENTITLEMENTS.spacesCreate),
-    openMembershipModal: () => setFounderSponsorOpen(true),
+    openMembershipModal: () => undefined,
   });
   const visibleGlobalSidebarContent = !sidebarVisualCollapsed ? globalSidebarContent : null;
   const {
@@ -352,15 +347,6 @@ export function Layout({ children, currentView, onNavigate, immersiveMode = fals
     }
     onNavigate(item.view);
   }, [onNavigate]);
-  const openFounderSponsorBilling = useCallback(() => {
-    setFounderSponsorOpen(false);
-    dispatchAppIntent({
-      type: 'settings.open',
-      tab: 'ai',
-      aiModelSubTab: 'login',
-    });
-  }, []);
-
   const renderSidebarNavItem = (item: SidebarNavItem) => {
     const { key, view, labelKey, icon: Icon, primary } = item;
     const label = t(labelKey);
@@ -474,33 +460,6 @@ export function Layout({ children, currentView, onNavigate, immersiveMode = fals
 
           {/* Footer */}
           <div className={clsx('border-t border-border', sidebarVisualCollapsed ? 'px-2 py-2 flex flex-col items-center gap-2' : 'px-4 py-2 space-y-2')}>
-            <button
-              type="button"
-              onClick={() => setFounderSponsorOpen(true)}
-              className={clsx(
-                'app-founder-sponsor-button group inline-flex shrink-0 items-center justify-center transition-all',
-                sidebarVisualCollapsed
-                  ? 'h-8 w-8 rounded-md'
-                  : 'h-9 w-full rounded-lg px-2.5',
-                isSpaceMenuOpen && 'z-0'
-              )}
-              title={t(founderSponsorState.labelKey)}
-              aria-label={t(founderSponsorState.labelKey)}
-              data-active={founderSponsorState.active ? 'true' : 'false'}
-            >
-              {founderSponsorState.active ? (
-                <Crown className="h-[16px] w-[16px] shrink-0" strokeWidth={1.9} />
-              ) : (
-                <Crown className="h-[16px] w-[16px] shrink-0" strokeWidth={1.85} />
-              )}
-              {!sidebarVisualCollapsed && (
-                <>
-                  <span className="min-w-0 flex-1 truncate text-left text-[12px] font-semibold">
-                    {t(founderSponsorState.labelKey)}
-                  </span>
-                </>
-              )}
-            </button>
             {sidebarVisualCollapsed && (
               <button
                 type="button"
@@ -726,14 +685,6 @@ export function Layout({ children, currentView, onNavigate, immersiveMode = fals
           openReleasePage={openReleasePage}
           installUpdate={installUpdate}
           closeNotice={closeUpdateNotice}
-        />
-      )}
-
-      {founderSponsorOpen && (
-        <FounderSponsorModal
-          active={founderSponsorState.active}
-          onClose={() => setFounderSponsorOpen(false)}
-          onOpenBilling={openFounderSponsorBilling}
         />
       )}
 

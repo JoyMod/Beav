@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./images/beav-icon.png" alt="Beav" width="88">
+  <img src="./images/beav-icon.png" alt="竹叶自媒体平台" width="88">
 </p>
 
-<h1 align="center">Beav</h1>
+<h1 align="center">竹叶自媒体平台</h1>
 
 <p align="center">
   <strong>从爆款采集到定时创作，一站式 AI 内容运营工作空间。</strong>
@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://redbox.ziz.hk"><strong><big>下载 Beav</big></strong></a>
+  <a href="https://redbox.ziz.hk"><strong><big>下载 竹叶自媒体平台</big></strong></a>
 </p>
 
 <p align="center">
@@ -28,15 +28,15 @@
 </p>
 
 <p align="center">
-  <img src="./images/beav-agent-workflow-hero.png" alt="Beav AI 内容运营工作空间" width="50%">
+  <img src="./images/beav-agent-workflow-hero.png" alt="竹叶自媒体平台 AI 内容运营工作空间" width="50%">
 </p>
 
-> RedBox 已更名为 **Beav**；原有本地数据和工作空间不受影响。
+> 这是面向个人本地化使用的二次开发版本；保留旧版内部兼容标识，原有本地数据和工作空间不受影响。
 
 <p align="center"><strong>加入讨论群</strong></p>
 
 <p align="center">
-  <img src="./images/beav-discussion-group.jpg" alt="加入 Beav AI 创作交流群" width="30%">
+  <img src="./images/beav-discussion-group.jpg" alt="加入 竹叶自媒体平台 AI 创作交流群" width="30%">
 </p>
 
 ## 为什么需要这个项目？
@@ -44,7 +44,7 @@
 - **运营时间被素材吞噬**：内容运营每天都要审阅大量素材、追踪热点、寻找灵感。AI 已能显著加速这些高频工作，但缺少把采集、选题和创作串起来的专用工具。
 - **通用 AI 不懂内容资产**：Codex、Workbody 等工具主要面向程序员或通用办公，并非为自媒体工作者设计，难以同时承担长期素材库与持续创作工作台。
 
-Beav 因此而生：把 AI 变成自媒体工作者真正可持续使用的素材库和运营工作台。
+竹叶自媒体平台 因此而生：把 AI 变成自媒体工作者真正可持续使用的素材库和运营工作台。
 
 ## 工作流
 
@@ -60,13 +60,13 @@ Beav 因此而生：把 AI 变成自媒体工作者真正可持续使用的素�
 
 ## 自动社媒调研
 
-围绕你的账号定位、选题目标和已有素材，Beav 会自主检索多个社交平台的公开内容，先筛选候选素材，再深读高价值内容。调研结果可直接沉淀到知识库，成为后续选题、写稿和创作时可检索、可复用的依据。
+围绕你的账号定位、选题目标和已有素材，竹叶自媒体平台 会自主检索多个社交平台的公开内容，先筛选候选素材，再深读高价值内容。调研结果可直接沉淀到知识库，成为后续选题、写稿和创作时可检索、可复用的依据。
 
-![Beav 自动检索并深读社媒内容](./images/automated-social-research.jpg)
+![竹叶自媒体平台 自动检索并深读社媒内容](./images/automated-social-research.jpg)
 
 ## 跨平台博主订阅
 
-订阅任意平台的博主或创作者主页，Beav 会每天自动获取其最新内容，并按时间线保存到你的知识库。你可以像追踪一个持续更新的素材源一样，随时检索、筛选和复用这些内容，不必反复手动打开各个平台查看更新。
+订阅任意平台的博主或创作者主页，竹叶自媒体平台 会每天自动获取其最新内容，并按时间线保存到你的知识库。你可以像追踪一个持续更新的素材源一样，随时检索、筛选和复用这些内容，不必反复手动打开各个平台查看更新。
 
 ![订阅博主后每日自动同步到知识库](./images/creator-subscription-daily-sync.jpg)
 
@@ -131,7 +131,7 @@ IPWO 提供全球住宅IP资源，支持多地区 IP 环境访问，为自动化
 
 ## 快速开始
 
-1. 前往 [下载页](https://redbox.ziz.hk/download) 安装 Beav。
+1. 前往 [下载页](https://redbox.ziz.hk/download) 安装 竹叶自媒体平台。
 2. 为一个账号或品牌创建一个工作空间。
 3. 在 `设置 → AI` 使用官方 AI，或配置自己的 Endpoint、API Key 和模型。
 4. 如需网页采集，从 [最新 Release](https://github.com/Jamailar/Beav/releases/latest) 获取 Chrome / Edge 扩展。
@@ -145,20 +145,20 @@ IPWO 提供全球住宅IP资源，支持多地区 IP 环境访问，为自动化
 
 ## Agent 插件
 
-Beav Creator 插件让 Codex Desktop 或 WorkBuddy 通过 MCP 连接本机 Beav，把创作任务交给 Beav 内部 Agent；用户仍在 Beav UI 中查看、审批和编辑结果。
+竹叶自媒体平台 Creator 插件让 Codex Desktop 或 WorkBuddy 通过 MCP 连接本机 竹叶自媒体平台，把创作任务交给 竹叶自媒体平台 内部 Agent；用户仍在 竹叶自媒体平台 UI 中查看、审批和编辑结果。
 
-先安装并启动 Beav（CLI 用户运行 `beav open`），再把对应指令发给宿主 Agent：
+先安装并启动 竹叶自媒体平台（CLI 用户运行 `beav open`），再把对应指令发给宿主 Agent：
 
 **Codex**
 
 ```text
-/goal Read https://beav.ziz.hk/agent to install the Beav Creator plugin and set up a new task for me.
+/goal Read https://beav.ziz.hk/agent to install the 竹叶自媒体平台 Creator plugin and set up a new task for me.
 ```
 
 **WorkBuddy**
 
 ```text
-Read https://beav.ziz.hk/workbuddy to install the Beav Creator plugin and connect it to my local Beav workspace.
+Read https://beav.ziz.hk/workbuddy to install the 竹叶自媒体平台 Creator plugin and connect it to my local 竹叶自媒体平台 workspace.
 ```
 
 安装完成后，直接在 Codex 或 WorkBuddy 中描述任务即可；浏览器 UI 只供用户操作，不作为 Agent 控制通道。
@@ -170,7 +170,7 @@ Read https://beav.ziz.hk/workbuddy to install the Beav Creator plugin and connec
 - [问题反馈](https://github.com/Jamailar/Beav/issues)
 - [Bilibili 视频教程](https://www.bilibili.com/video/BV12LNn6nEem/)
 
-Beav 由 [JambaHailar](https://x.com/JambaHailar) 独立开发和维护。
+竹叶自媒体平台 由 [JambaHailar](https://x.com/JambaHailar) 独立开发和维护。
 
 ## 开源版本说明
 

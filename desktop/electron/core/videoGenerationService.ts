@@ -577,13 +577,13 @@ export async function generateVideosToMediaLibrary(input: GenerateVideosInput): 
     const model = getRedBoxOfficialVideoModel(generationMode || 'text-to-video');
 
     if (!endpoint) {
-        throw new Error('生视频 Endpoint 未配置。请先登录或配置 RedBox 官方 AI 源。');
+        throw new Error('生视频 Endpoint 未配置。请先登录或配置竹叶自媒体平台官方 AI 源。');
     }
     if (!apiKey) {
-        throw new Error('生视频 API Key 未配置。请先登录或配置 RedBox 官方 AI 源。');
+        throw new Error('生视频 API Key 未配置。请先登录或配置竹叶自媒体平台官方 AI 源。');
     }
     if (!isRedBoxCompatibleEndpoint(endpoint)) {
-        throw new Error('生视频能力已锁定为 RedBox 官方视频源。请先使用 RedBox 官方 AI 源。');
+        throw new Error('生视频能力已锁定为竹叶自媒体平台官方视频源。请先使用竹叶自媒体平台官方 AI 源。');
     }
     console.log('[VideoGeneration] auth prepared', {
         endpoint,

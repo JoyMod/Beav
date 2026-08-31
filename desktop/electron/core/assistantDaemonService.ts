@@ -400,7 +400,7 @@ function buildRelayPrompt(message: AssistantDaemonIngressMessage): string {
 
 function buildWeixinRelayPrompt(message: AssistantDaemonIngressMessage, strategy: WeixinExecutionStrategy): string {
   const lines = [
-    '你现在是 RedBox 里的自媒体运营助手，负责通过微信和用户沟通。',
+    '你现在是竹叶自媒体平台里的自媒体运营助手，负责通过微信和用户沟通。',
     '你处理的是微信私聊消息，回复必须适合直接发送到微信文本消息。',
     `会话键: ${message.accountId ? `${message.accountId}:` : ''}${message.peerId}`,
   ];

@@ -208,7 +208,7 @@ export class AcpGatewayService extends EventEmitter {
       schemaVersion: 'redbox.acp.v1',
       agent: {
         id: 'redbox.creator-agent',
-        name: 'RedBox Creator Agent',
+        name: '竹叶自媒体平台 Creator Agent',
         description: 'A local creator agent for self-media assets, material retrieval, drafting, cover/video planning, and creator project packaging.',
         home: baseUrl,
         localOnly: true,
@@ -242,7 +242,7 @@ export class AcpGatewayService extends EventEmitter {
         artifacts: `${baseUrl}${ACP_BASE_PATH}/artifacts/{artifact_id}`,
       },
       sessionRouting: {
-        autoCreate: 'Omit sessionId/acpSessionId to create a new ACP-labeled RedBox conversation.',
+        autoCreate: 'Omit sessionId/acpSessionId to create a new ACP-labeled 竹叶自媒体平台 conversation.',
         explicitAttach: 'Pass sessionId/acpSessionId to continue an existing ACP or chat session.',
         chatProjection: 'Every ACP run is projected into the Electron chat history through SessionBridgeService.',
       },
@@ -254,9 +254,9 @@ export class AcpGatewayService extends EventEmitter {
       success: true,
       contentType: 'text/markdown',
       guide: [
-        '# RedBox ACP Guide',
+        '# 竹叶自媒体平台 ACP Guide',
         '',
-        'RedBox exposes a local Agent Communication Protocol for external agents that need a creator-side material library and content production partner.',
+        '竹叶自媒体平台 exposes a local Agent Communication Protocol for external agents that need a creator-side material library and content production partner.',
         '',
         `Base URL: \`${this.getBaseUrl()}\``,
         '',
@@ -266,7 +266,7 @@ export class AcpGatewayService extends EventEmitter {
         '- `GET /acp/v1/manifest`',
         '- `GET /acp/v1/guide`',
         '',
-        'Preferred local discovery file: `acp-gateway.json` under the RedBox application support directory.',
+        'Preferred local discovery file: `acp-gateway.json` under the legacy-compatible application support directory.',
         '',
         '## Start A Run',
         '',
@@ -281,8 +281,8 @@ export class AcpGatewayService extends EventEmitter {
         'Poll `GET /acp/v1/runs/{run_id}` and `GET /acp/v1/runs/{run_id}/events` until the run is completed, failed, or cancelled.',
       ].join('\n'),
       copyPrompts: {
-        codex: 'Read RedBox acp-gateway.json when available, then read manifestUrl and guideUrl. Use /acp/v1/runs to talk to RedBox Creator Agent. Set client.name=Codex.',
-        generic: 'Discover RedBox from acp-gateway.json or http://127.0.0.1:31937/acp/v1, then POST /acp/v1/runs with client.name and prompt.',
+        codex: 'Read the 竹叶自媒体平台 acp-gateway.json when available, then read manifestUrl and guideUrl. Use /acp/v1/runs to talk to 竹叶自媒体平台 Creator Agent. Set client.name=Codex.',
+        generic: 'Discover 竹叶自媒体平台 from acp-gateway.json or http://127.0.0.1:31937/acp/v1, then POST /acp/v1/runs with client.name and prompt.',
       },
     };
   }
@@ -292,7 +292,7 @@ export class AcpGatewayService extends EventEmitter {
     const baseUrl = this.getBaseUrl();
     const payload = {
       schemaVersion: 'redbox.acp.discovery.v1',
-      product: 'RedBox',
+      product: '竹叶自媒体平台',
       agentId: 'redbox.creator-agent',
       enabled: this.enabled,
       listening: Boolean(input.listening),

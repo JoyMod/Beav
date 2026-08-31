@@ -70,6 +70,29 @@ export function buildFallbackResponse(channel: string, error: unknown): any {
     };
   }
 
+  if (channel === 'knowledge:get-index-status') {
+    return {
+      indexedCount: 0,
+      visualIndex: {
+        totalUnits: 0,
+        indexedUnits: 0,
+        metadataOnlyUnits: 0,
+        failedUnits: 0,
+        retryDeferredUnits: 0,
+        retryReadyUnits: 0,
+        lastAttemptedAt: null,
+      },
+      pendingCount: 0,
+      failedCount: 0,
+      rebuildProgress: null,
+      lastIndexedAt: null,
+      isBuilding: false,
+      lastError: null,
+      migrationStatus: null,
+      pendingRebuildReason: null,
+    };
+  }
+
   if (
     channel.endsWith(':list')
     || channel.includes('list-sessions')
@@ -90,6 +113,6 @@ export function buildFallbackResponse(channel: string, error: unknown): any {
 
   return {
     success: false,
-    error: `RedBox host request failed for "${channel}": ${message}`,
+    error: `竹叶自媒体平台 host request failed for "${channel}": ${message}`,
   };
 }

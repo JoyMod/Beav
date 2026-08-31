@@ -37,6 +37,28 @@ const explicitChannelByCommand = Object.fromEntries(
 ) as Record<string, string>;
 
 const channelListeners = new Map<string, Map<Listener, ListenerRecord>>();
+const LOCAL_BROWSER_INVOKE_URL = 'http://127.0.0.1:23456/api/local/invoke';
+
+function isLocalBrowserRuntime(): boolean {
+  if (typeof window === 'undefined') return false;
+  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+}
+
+export async function invokeLocalBrowserChannel(channel: string, payload?: unknown): Promise<any> {
+  if (!isLocalBrowserRuntime()) {
+    throw new Error('Local browser bridge is only available on localhost');
+  }
+  const response = await fetch(LOCAL_BROWSER_INVOKE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ channel, payload: payload ?? null }),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(result?.error || `Local browser bridge failed with HTTP ${response.status}`);
+  }
+  return result;
+}
 
 function isTauriRuntime(): boolean {
   return false;
@@ -62,11 +84,11 @@ async function invokeChannel(channel: string, payload?: unknown): Promise<any> {
   try {
     const transport = getElectronTransport();
     if (!transport) {
-      throw new Error('Electron IPC transport is unavailable');
+      return await invokeLocalBrowserChannel(channel, payload);
     }
     return await transport.invoke(channel, payload ?? null);
   } catch (error) {
-    console.warn(`[RedBox] invoke failed for ${channel}:`, error);
+    console.warn(`[竹叶自媒体平台] invoke failed for ${channel}:`, error);
     return buildFallbackResponse(channel, error);
   }
 }
@@ -74,7 +96,7 @@ async function invokeChannel(channel: string, payload?: unknown): Promise<any> {
 function sendChannel(channel: string, payload?: unknown): void {
   const transport = getElectronTransport();
   if (!transport) {
-    console.warn(`[RedBox] send skipped for ${channel}: Electron IPC transport is unavailable`);
+    console.warn(`[竹叶自媒体平台] send skipped for ${channel}: Electron IPC transport is unavailable`);
     return;
   }
   transport.send(channel, payload ?? null);
@@ -84,11 +106,11 @@ async function invokeCommand<T = unknown>(command: string, args?: unknown): Prom
   try {
     const transport = getElectronTransport();
     if (!transport) {
-      throw new Error('Electron IPC transport is unavailable');
+      return await invokeLocalBrowserChannel(explicitChannelByCommand[command] || command, args) as T;
     }
     return await transport.invoke(explicitChannelByCommand[command] || command, args ?? null);
   } catch (error) {
-    console.warn(`[RedBox] command invoke failed for ${command}:`, error);
+    console.warn(`[竹叶自媒体平台] command invoke failed for ${command}:`, error);
     throw error;
   }
 }
@@ -122,7 +144,7 @@ async function invokeChannelGuarded<T = unknown>(
 
     if (value === Symbol.for('__redbox_ipc_timeout__')) {
       const timeoutError = new Error(`Timed out after ${timeoutMs}ms`);
-      console.warn(`[RedBox] invoke timed out for ${channel}:`, timeoutError.message);
+      console.warn(`[竹叶自媒体平台] invoke timed out for ${channel}:`, timeoutError.message);
       return resolveGuardFallback(channel, timeoutError, options?.fallback);
     }
 
@@ -130,14 +152,14 @@ async function invokeChannelGuarded<T = unknown>(
       try {
         return options.normalize(value);
       } catch (error) {
-        console.warn(`[RedBox] invoke normalization failed for ${channel}:`, error);
+        console.warn(`[竹叶自媒体平台] invoke normalization failed for ${channel}:`, error);
         return resolveGuardFallback(channel, error, options?.fallback);
       }
     }
 
     return value as T;
   } catch (error) {
-    console.warn(`[RedBox] guarded invoke failed for ${channel}:`, error);
+    console.warn(`[竹叶自媒体平台] guarded invoke failed for ${channel}:`, error);
     return resolveGuardFallback(channel, error, options?.fallback);
   }
 }
@@ -162,7 +184,7 @@ async function invokeCommandGuarded<T = unknown>(
 
     if (value === Symbol.for('__redbox_ipc_timeout__')) {
       const timeoutError = new Error(`Timed out after ${timeoutMs}ms`);
-      console.warn(`[RedBox] command invoke timed out for ${command}:`, timeoutError.message);
+      console.warn(`[竹叶自媒体平台] command invoke timed out for ${command}:`, timeoutError.message);
       return resolveGuardFallback(fallbackKey, timeoutError, options?.fallback);
     }
 
@@ -170,7 +192,7 @@ async function invokeCommandGuarded<T = unknown>(
       try {
         return options.normalize(value);
       } catch (error) {
-        console.warn(`[RedBox] command normalization failed for ${command}:`, error);
+        console.warn(`[竹叶自媒体平台] command normalization failed for ${command}:`, error);
         return resolveGuardFallback(fallbackKey, error, options?.fallback);
       }
     }
@@ -184,7 +206,7 @@ async function invokeCommandGuarded<T = unknown>(
 function on(channel: string, listener: Listener): void {
   const transport = getElectronTransport();
   if (!transport) {
-    console.warn(`[RedBox] listener skipped for ${channel}: Electron IPC transport is unavailable`);
+    console.warn(`[竹叶自媒体平台] listener skipped for ${channel}: Electron IPC transport is unavailable`);
     return;
   }
 

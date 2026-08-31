@@ -3507,10 +3507,10 @@ export function GenerationStudio({
                 type="button"
                 onClick={() => setStudioMode('image')}
                 className={clsx(
-                    'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-1.5 text-[14px] font-medium',
+                    'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-1.5 text-[14px] font-medium transition-colors',
                     studioMode === 'image'
-                        ? 'border-brand-red/50 bg-brand-red text-white'
-                        : 'border-border bg-surface-primary text-text-secondary',
+                        ? 'border-brand-red/40 bg-brand-red/90 text-white shadow-[0_6px_16px_rgb(var(--color-brand-red)/0.18)]'
+                        : 'border-border/70 bg-surface-primary/45 text-text-secondary hover:border-border hover:bg-surface-primary/70 hover:text-text-primary',
                 )}
             >
                 <ImagePlus className="h-4 w-4" />
@@ -3520,10 +3520,10 @@ export function GenerationStudio({
                 type="button"
                 onClick={() => setStudioMode('cover')}
                 className={clsx(
-                    'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-1.5 text-[14px] font-medium',
+                    'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-1.5 text-[14px] font-medium transition-colors',
                     studioMode === 'cover'
-                        ? 'border-brand-red/50 bg-brand-red text-white'
-                        : 'border-border bg-surface-primary text-text-secondary',
+                        ? 'border-brand-red/40 bg-brand-red/90 text-white shadow-[0_6px_16px_rgb(var(--color-brand-red)/0.18)]'
+                        : 'border-border/70 bg-surface-primary/45 text-text-secondary hover:border-border hover:bg-surface-primary/70 hover:text-text-primary',
                 )}
             >
                 <Layers className="h-4 w-4" />
@@ -3533,10 +3533,10 @@ export function GenerationStudio({
                 type="button"
                 onClick={() => setStudioMode('video')}
                 className={clsx(
-                    'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-1.5 text-[14px] font-medium',
+                    'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-1.5 text-[14px] font-medium transition-colors',
                     studioMode === 'video'
-                        ? 'border-brand-red/50 bg-brand-red text-white'
-                        : 'border-border bg-surface-primary text-text-secondary',
+                        ? 'border-brand-red/40 bg-brand-red/90 text-white shadow-[0_6px_16px_rgb(var(--color-brand-red)/0.18)]'
+                        : 'border-border/70 bg-surface-primary/45 text-text-secondary hover:border-border hover:bg-surface-primary/70 hover:text-text-primary',
                 )}
             >
                 <Clapperboard className="h-4 w-4" />
@@ -3546,10 +3546,10 @@ export function GenerationStudio({
                 type="button"
                 onClick={() => setStudioMode('audio')}
                 className={clsx(
-                    'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-1.5 text-[14px] font-medium',
+                    'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-1.5 text-[14px] font-medium transition-colors',
                     studioMode === 'audio'
-                        ? 'border-brand-red/50 bg-brand-red text-white'
-                        : 'border-border bg-surface-primary text-text-secondary',
+                        ? 'border-brand-red/40 bg-brand-red/90 text-white shadow-[0_6px_16px_rgb(var(--color-brand-red)/0.18)]'
+                        : 'border-border/70 bg-surface-primary/45 text-text-secondary hover:border-border hover:bg-surface-primary/70 hover:text-text-primary',
                 )}
             >
                 <Music2 className="h-4 w-4" />
@@ -3662,12 +3662,31 @@ export function GenerationStudio({
                     )}
                 </main>
 
-                <footer className="bg-background pb-5 pt-4">
+                <footer
+                    className="-mx-6 px-6 pb-5 pt-8"
+                    style={{
+                        background: 'linear-gradient(180deg, rgb(var(--color-background) / 0) 0%, rgb(var(--color-background) / 0.7) 32%, rgb(var(--color-background) / 0.96) 100%)',
+                    }}
+                >
                     <div className={composerWidthClass}>
-                        <div className="rounded-[24px] border border-border bg-surface-secondary px-5 py-3 shadow-[var(--ui-shadow-1)]">
+                        <div
+                            className="rounded-[24px] border px-5 py-3 backdrop-blur-xl"
+                            style={{
+                                background: 'radial-gradient(120% 180% at 8% -70%, rgb(var(--color-accent-primary) / 0.16), transparent 58%), var(--ai-panel-background)',
+                                borderColor: 'var(--ai-panel-border)',
+                                boxShadow: 'var(--ai-panel-shadow)',
+                            }}
+                        >
                             {studioToolbar}
 
-                            <div className="mt-3 rounded-[20px] border border-border bg-surface-primary p-4">
+                            <div
+                                className="mt-3 rounded-[20px] border p-4"
+                                style={{
+                                    background: 'linear-gradient(145deg, rgb(var(--color-surface-primary) / 0.68) 0%, rgb(var(--color-background) / 0.5) 100%)',
+                                    borderColor: 'rgb(var(--color-border) / 0.66)',
+                                    boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.035)',
+                                }}
+                            >
                                 <div className={composerGridClass}>
                                     {(studioMode === 'image' || studioMode === 'cover' || studioMode === 'video') && (
                                         <div className="space-y-3">

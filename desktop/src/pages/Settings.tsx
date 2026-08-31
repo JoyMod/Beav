@@ -93,7 +93,6 @@ import {
   serializeEcommercePlatformsSettings,
   type EcommercePlatformsSettings,
 } from '../features/ecommerce-platforms/catalog';
-import { useOfficialAuthState } from '../hooks/useOfficialAuthState';
 import { useI18n, type I18nKey } from '../i18n';
 import {
   GeneralSettingsSection,
@@ -1656,12 +1655,17 @@ export function Settings({
     : 'chat';
 
   const groupedAiPresets = useMemo<AiPresetGroup[]>(() => {
-    const codingPlan = AI_SOURCE_PRESETS.filter((preset) => preset.group === 'coding-plan');
-    const general = AI_SOURCE_PRESETS.filter((preset) => preset.group !== 'coding-plan');
-    return [
-      { id: 'general', label: '通用供应商', items: general },
-      { id: 'coding-plan', label: 'Coding Plan', items: codingPlan },
-    ].filter((group) => group.items.length > 0);
+    const groups: Array<{ id: AiSourcePreset['group']; label: string }> = [
+      { id: 'popular', label: '热门推荐' },
+      { id: 'china', label: '国内平台' },
+      { id: 'global', label: '海外平台' },
+      { id: 'local', label: '本地模型' },
+      { id: 'coding-plan', label: 'Coding Plan' },
+    ];
+    return groups.map((group) => ({
+      ...group,
+      items: AI_SOURCE_PRESETS.filter((preset) => preset.group === group.id),
+    })).filter((group) => group.items.length > 0);
   }, []);
 
   // Tools State
@@ -1721,7 +1725,6 @@ export function Settings({
   const [OfficialAiPanelComponent, setOfficialAiPanelComponent] = useState<ComponentType<OfficialAiPanelProps> | null>(null);
   const officialAiPanelRef = useRef<HTMLDivElement | null>(null);
   const pendingOfficialAiPanelScrollRef = useRef(false);
-  const { snapshot: officialAuthState, bootstrapped: officialAuthBootstrapped } = useOfficialAuthState();
 
   useEffect(() => {
     if (!navigationTarget) return;
@@ -1841,17 +1844,9 @@ export function Settings({
     ];
   }, [aiSources, hasOfficialManagedSource, officialAiPanelEnabled, officialAiSourcePlaceholder]);
 
-  const officialAuthStatus = String((officialAuthState as { status?: string } | null)?.status || '').trim();
-  const officialAuthKnown = officialAuthBootstrapped;
-  const officialAuthPending = !officialAuthBootstrapped
-    || officialAuthStatus === 'restoring'
-    || officialAuthStatus === 'refreshing';
-  const officialAuthLoggedIn = officialAuthKnown
-    && officialAuthStatus !== 'anonymous'
-    && officialAuthStatus !== 'reauthRequired'
-    && officialAuthStatus !== 'restoring'
-    && Boolean((officialAuthState as { loggedIn?: boolean } | null)?.loggedIn);
-  const officialAuthNeedsLogin = officialAuthKnown && !officialAuthPending && !officialAuthLoggedIn;
+  const officialAuthPending = false;
+  const officialAuthLoggedIn = false;
+  const officialAuthNeedsLogin = false;
   const officialAiSource = useMemo(() => (
     displayedAiSources.find((source) => isOfficialManagedSource(source)) || null
   ), [displayedAiSources, isOfficialManagedSource]);
@@ -2084,8 +2079,7 @@ export function Settings({
     sources: AiSourceConfig[] = aiSources,
     legacyChatSourceId: string = aiModelRoutes.chat.sourceId || defaultAiSourceId,
   ) => {
-    const normalizedChatSourceId = canonicalizeOfficialAutoSourceId(legacyChatSourceId)
-      || OFFICIAL_AUTO_SOURCE_ID;
+    const normalizedChatSourceId = canonicalizeOfficialAutoSourceId(legacyChatSourceId);
     let sanitizedSources: AiSourceConfig[] = sources
       .map((source) => ({
         ...source,
@@ -2113,26 +2107,20 @@ export function Settings({
           source.model ? { id: source.model } : null,
         ]),
       }))
-      .filter((source) => !isDeprecatedEmptyOpenAiSource(source));
-
-    if (
-      isOfficialAutoSourceId(normalizedChatSourceId)
-      && !sanitizedSources.some((source) => isOfficialManagedSource(source))
-    ) {
-      sanitizedSources = [officialAiSourcePlaceholder, ...sanitizedSources];
-    }
+      .filter((source) => !isDeprecatedEmptyOpenAiSource(source))
+      .filter((source) => !isOfficialManagedSource(source));
 
     const legacyChatSource = sanitizedSources.find((source) => source.id === normalizedChatSourceId)
-      || (isOfficialAutoSourceId(normalizedChatSourceId) ? officialAiSourcePlaceholder : sanitizedSources[0]);
+      || sanitizedSources[0];
     return {
       sanitizedSources,
-      resolvedLegacyChatSourceId: normalizedChatSourceId,
+      resolvedLegacyChatSourceId: legacyChatSource?.id || '',
       legacyChatSource,
       resolvedApiEndpoint: String(legacyChatSource?.baseURL || '').trim(),
       resolvedApiKey: String(legacyChatSource?.apiKey || '').trim(),
       resolvedModelName: String(aiModelRoutes.chat.model || legacyChatSource?.model || '').trim(),
     };
-  }, [aiModelRoutes.chat.model, aiModelRoutes.chat.sourceId, aiSources, defaultAiSourceId, isDeprecatedEmptyOpenAiSource, isOfficialManagedSource, officialAiSourcePlaceholder]);
+  }, [aiModelRoutes.chat.model, aiModelRoutes.chat.sourceId, aiSources, defaultAiSourceId, isDeprecatedEmptyOpenAiSource, isOfficialManagedSource]);
 
   const persistAiSourcesSnapshot = useCallback(async (
     sources: AiSourceConfig[] = aiSources,
@@ -2142,13 +2130,14 @@ export function Settings({
     const snapshot = buildAiSourcePersistenceSnapshot(sources, legacyChatSourceId);
     await window.ipcRenderer.saveSettings({
       ai_sources_json: JSON.stringify(snapshot.sanitizedSources),
+      ai_model_routes_json: JSON.stringify(aiModelRoutes),
       default_ai_source_id: snapshot.resolvedLegacyChatSourceId || snapshot.legacyChatSource?.id || '',
       api_endpoint: snapshot.resolvedApiEndpoint,
       api_key: snapshot.resolvedApiKey,
       model_name: snapshot.resolvedModelName,
     });
     clearAiSourceDraftDirty(saveGeneration);
-  }, [aiModelRoutes.chat.sourceId, aiSources, buildAiSourcePersistenceSnapshot, clearAiSourceDraftDirty, defaultAiSourceId]);
+  }, [aiModelRoutes, aiSources, buildAiSourcePersistenceSnapshot, clearAiSourceDraftDirty, defaultAiSourceId]);
 
   const updateAiSource = useCallback((sourceId: string, updater: (source: AiSourceConfig) => AiSourceConfig) => {
     markAiSourceDraftDirty();
@@ -2204,6 +2193,17 @@ export function Settings({
 
     markAiSourceDraftDirty();
     setAiSources((prev) => [...prev, nextSource]);
+    if (!customAiSources.length) {
+      setDefaultAiSourceId(nextSource.id);
+      setAiModelRoutes((prev) => {
+        const next = { ...prev };
+        for (const scope of ['chat', 'wander', 'team', 'knowledge', 'redclaw'] as AiModelRouteScope[]) {
+          next[scope] = { mode: 'custom', sourceId: nextSource.id, model: '' };
+        }
+        setFormData((data) => ({ ...data, ai_model_routes_json: JSON.stringify(next) }));
+        return next;
+      });
+    }
     setActiveAiSourceId(nextSource.id);
     setAiSourceExpandState((prev) => ({ ...prev, [nextSource.id]: true }));
     setIsCreateAiSourceModalOpen(false);
@@ -2324,11 +2324,7 @@ export function Settings({
   }, []);
 
   const applyRouteSource = useCallback((scope: AiModelRouteScope, mode: AiModelRouteMode) => {
-    const nextMode = (
-      (scope === 'visualIndex' || scope === 'videoAnalysis') && mode === 'disabled'
-        ? 'official'
-        : mode
-    );
+    const nextMode = mode;
     if (nextMode === 'custom' && !firstCustomAiSource) {
       setMissingCustomSourceNoticeScope(scope);
       return;
@@ -3682,9 +3678,10 @@ export function Settings({
         };
 
         const requestedDefaultSourceId = canonicalizeOfficialAutoSourceId(String(settings.default_ai_source_id || '').trim());
-        const prefersOfficialDefault = isOfficialAutoSourceId(requestedDefaultSourceId);
-        let sourceList = parseAiSources(settings.ai_sources_json).filter((source) => !isDeprecatedEmptyOpenAiSource(source));
-        if (!sourceList.length && !prefersOfficialDefault && (settings.api_endpoint || settings.api_key || settings.model_name)) {
+        let sourceList = parseAiSources(settings.ai_sources_json)
+          .filter((source) => !isDeprecatedEmptyOpenAiSource(source))
+          .filter((source) => !isOfficialManagedSource(source));
+        if (!sourceList.length && (settings.api_endpoint || settings.api_key || settings.model_name)) {
           const inferredPresetId = inferPresetIdByEndpoint(settings.api_endpoint || '');
           sourceList = [{
             id: generateAiSourceId(),
@@ -3699,12 +3696,14 @@ export function Settings({
           }];
         }
 
-        const loadedDefaultId = requestedDefaultSourceId || sourceList[0]?.id || OFFICIAL_AUTO_SOURCE_ID;
+        const loadedDefaultId = isOfficialAutoSourceId(requestedDefaultSourceId)
+          ? sourceList[0]?.id || ''
+          : requestedDefaultSourceId || sourceList[0]?.id || '';
         const normalizedDefaultId = sourceList.some((source) => source.id === loadedDefaultId)
           ? loadedDefaultId
-          : (loadedDefaultId === OFFICIAL_AUTO_SOURCE_ID ? OFFICIAL_AUTO_SOURCE_ID : (sourceList[0]?.id || OFFICIAL_AUTO_SOURCE_ID));
+          : sourceList[0]?.id || '';
         const resolvedDefaultSource = sourceList.find((source) => source.id === normalizedDefaultId)
-          || (isOfficialAutoSourceId(normalizedDefaultId) ? officialAiSourcePlaceholder : sourceList[0])
+          || sourceList[0]
           || null;
         const resolvedTranscriptionSourceId = resolveLinkedSourceIdFromList({
           endpoint: String(settings.transcription_endpoint || settings.api_endpoint || '').trim(),
@@ -3760,13 +3759,12 @@ export function Settings({
         const firstCustomSourceIdFromList = sourceList.find((source) => !isOfficialManagedSource(source))?.id || '';
         const loadedChatRouteSourceId = canonicalizeOfficialAutoSourceId(String(loadedModelRoutes.chat.sourceId || '').trim());
         const resolvedChatSourceId = loadedModelRoutes.chat.mode === 'official'
-          ? OFFICIAL_AUTO_SOURCE_ID
+          ? ''
           : loadedChatRouteSourceId
             || (loadedModelRoutes.chat.mode === 'custom' ? firstCustomSourceIdFromList : '')
             || normalizedDefaultId
-            || OFFICIAL_AUTO_SOURCE_ID;
+            || '';
         const resolvedChatSource = sourceList.find((source) => source.id === resolvedChatSourceId)
-          || (isOfficialAutoSourceId(resolvedChatSourceId) ? officialAiSourcePlaceholder : null)
           || resolvedDefaultSource
           || null;
         const loadedVoiceTtsModel = String(loadedModelRoutes.voiceTts.model || settings.voice_tts_model || settings.tts_model || DEFAULT_VOICE_TTS_MODEL).trim();
@@ -3838,13 +3836,13 @@ export function Settings({
           },
           visualIndex: {
             ...loadedModelRoutes.visualIndex,
-            mode: routeSourceMode(resolvedVisualIndexSourceId, loadedModelRoutes.visualIndex.mode === 'disabled' ? 'official' : loadedModelRoutes.visualIndex.mode),
+            mode: routeSourceMode(resolvedVisualIndexSourceId, loadedModelRoutes.visualIndex.mode),
             sourceId: resolvedVisualIndexSourceId,
             model: routeModelFirst(loadedModelRoutes.visualIndex.model, settings.visual_index_model),
           },
           videoAnalysis: {
             ...loadedModelRoutes.videoAnalysis,
-            mode: routeSourceMode(resolvedVideoAnalysisSourceId, loadedModelRoutes.videoAnalysis.mode === 'disabled' ? 'official' : loadedModelRoutes.videoAnalysis.mode),
+            mode: routeSourceMode(resolvedVideoAnalysisSourceId, loadedModelRoutes.videoAnalysis.mode),
             sourceId: resolvedVideoAnalysisSourceId,
             model: routeModelFirst(loadedModelRoutes.videoAnalysis.model, settings.video_analysis_model),
           },
@@ -3856,8 +3854,8 @@ export function Settings({
           },
           voiceClone: {
             ...loadedModelRoutes.voiceClone,
-            mode: 'official',
-            sourceId: OFFICIAL_AUTO_SOURCE_ID,
+            mode: routeSourceMode(resolvedVoiceSourceId, loadedModelRoutes.voiceClone.mode),
+            sourceId: resolvedVoiceSourceId,
             model: loadedVoiceCloneModel,
           },
         };
@@ -4004,14 +4002,8 @@ export function Settings({
         if (requestId !== settingsLoadRequestRef.current) return;
         setCurrentSpaceState(DEFAULT_SPACE_ID);
         setAiSources([]);
-        setDefaultAiSourceId(OFFICIAL_AUTO_SOURCE_ID);
-        setActiveAiSourceId((prevActiveId) => {
-          const currentActiveId = canonicalizeOfficialAutoSourceId(prevActiveId);
-          if (preserveViewState && isOfficialAutoSourceId(currentActiveId)) {
-            return currentActiveId;
-          }
-          return OFFICIAL_AUTO_SOURCE_ID;
-        });
+        setDefaultAiSourceId('');
+        setActiveAiSourceId('');
         setDetectedAiProtocol('openai');
         setMcpServers([]);
         setCliRuntimeExecutionMode('host_compatible');
@@ -5634,7 +5626,7 @@ export function Settings({
         resolvedModelName,
       } = buildAiSourcePersistenceSnapshot();
       const aiSourceSaveGeneration = aiSourceEditGenerationRef.current;
-      const fallbackRouteSource = officialAiSource || null;
+      const fallbackRouteSource = firstCustomAiSource || null;
       const resolvedTranscriptionSource = getAiSourceById(transcriptionSourceId) || fallbackRouteSource;
       const resolvedEmbeddingSource = getAiSourceById(embeddingSourceId) || fallbackRouteSource;
       const resolvedVisualIndexSource = getAiSourceById(visualIndexSourceId) || fallbackRouteSource;
@@ -5677,7 +5669,7 @@ export function Settings({
         ? String(formData.video_model || '').trim()
         : REDBOX_OFFICIAL_VIDEO_MODELS['text-to-video'];
       const selectedImageModel = String(resolvedImageModel || '').trim();
-      if (!selectedImageModel) {
+      if (aiModelRoutes.image.mode !== 'disabled' && !selectedImageModel) {
         throw new Error('请填写生图模型（可手动输入或从列表选择）');
       }
       const parsedCompactTokens = Number(formData.redclaw_compact_target_tokens);
@@ -5718,13 +5710,13 @@ export function Settings({
       const normalizedVisualIndexEndpoint = String(resolvedVisualIndexSource?.baseURL || formData.visual_index_endpoint || resolvedApiEndpoint).trim();
       const normalizedVisualIndexApiKey = String(resolvedVisualIndexSource?.apiKey || formData.visual_index_api_key || '').trim();
       const normalizedVisualIndexModel = resolvedVisualIndexModel;
-      if (!normalizedVisualIndexEndpoint || !normalizedVisualIndexModel) {
+      if (formData.visual_index_enabled && aiModelRoutes.visualIndex.mode !== 'disabled' && (!normalizedVisualIndexEndpoint || !normalizedVisualIndexModel)) {
         throw new Error('启用知识库视觉索引时必须填写多模态 Endpoint 和模型名');
       }
       const normalizedVideoAnalysisEndpoint = String(resolvedVideoAnalysisSource?.baseURL || formData.video_analysis_endpoint || resolvedApiEndpoint).trim();
       const normalizedVideoAnalysisApiKey = String(resolvedVideoAnalysisSource?.apiKey || formData.video_analysis_api_key || '').trim();
       const normalizedVideoAnalysisProtocol = String(resolvedVideoAnalysisSource?.protocol || formData.video_analysis_protocol || 'gemini').trim();
-      if (!normalizedVideoAnalysisEndpoint || !resolvedVideoAnalysisModel) {
+      if (aiModelRoutes.videoAnalysis.mode !== 'disabled' && (!normalizedVideoAnalysisEndpoint || !resolvedVideoAnalysisModel)) {
         throw new Error('启用视频分析专用模型时必须填写 Endpoint 和模型名');
       }
       const routeScopedSource = (scope: AiModelRouteScope) => getRouteSource(aiModelRoutes[scope]) || fallbackRouteSource;
@@ -5760,7 +5752,7 @@ export function Settings({
           return { ...route, sourceId: normalizedSourceId };
         }
         if (isOfficialAutoSourceId(normalizedSourceId) || route.mode === 'official') {
-          return { ...route, mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID };
+          return { ...route, mode: 'disabled', sourceId: '' };
         }
         if (normalizedSourceId) {
           return { ...route, mode: 'custom', sourceId: normalizedSourceId };
@@ -5791,7 +5783,7 @@ export function Settings({
       const routeVoiceCloneModel = resolvedVoiceCloneModel;
       const resolvedChatSource = routeScopedSource('chat') || legacyChatSource || null;
       const resolvedChatSourceId = canonicalizeOfficialAutoSourceId(
-        resolvedChatSource?.id || (aiModelRoutes.chat.mode === 'official' ? OFFICIAL_AUTO_SOURCE_ID : resolvedLegacyChatSourceId)
+        resolvedChatSource?.id || resolvedLegacyChatSourceId
       );
       const routeChatModelValue = routeModel(
         'chat',
@@ -5808,19 +5800,19 @@ export function Settings({
         }, resolvedChatSourceId),
         wander: normalizeRouteForSource(
           { ...aiModelRoutes.wander, model: routeChatModel('wander', formData.model_name_wander) },
-          aiModelRoutes.wander.sourceId || OFFICIAL_AUTO_SOURCE_ID,
+          aiModelRoutes.wander.sourceId || '',
         ),
         team: normalizeRouteForSource(
           { ...aiModelRoutes.team, model: routeChatModel('team', formData.model_name_chatroom) },
-          aiModelRoutes.team.sourceId || OFFICIAL_AUTO_SOURCE_ID,
+          aiModelRoutes.team.sourceId || '',
         ),
         knowledge: normalizeRouteForSource(
           { ...aiModelRoutes.knowledge, model: routeChatModel('knowledge', formData.model_name_knowledge) },
-          aiModelRoutes.knowledge.sourceId || OFFICIAL_AUTO_SOURCE_ID,
+          aiModelRoutes.knowledge.sourceId || '',
         ),
         redclaw: normalizeRouteForSource(
           { ...aiModelRoutes.redclaw, model: routeChatModel('redclaw', formData.model_name_redclaw) },
-          aiModelRoutes.redclaw.sourceId || OFFICIAL_AUTO_SOURCE_ID,
+          aiModelRoutes.redclaw.sourceId || '',
         ),
         transcription: normalizeRouteForSource(
           { ...aiModelRoutes.transcription, sourceId: resolvedTranscriptionSource?.id || '', model: routeTranscriptionModel },
@@ -5836,13 +5828,11 @@ export function Settings({
         ),
         visualIndex: normalizeRouteForSource({
           ...aiModelRoutes.visualIndex,
-          mode: aiModelRoutes.visualIndex.mode === 'disabled' ? 'official' : aiModelRoutes.visualIndex.mode,
           sourceId: resolvedVisualIndexSource?.id || '',
           model: routeVisualIndexModel,
         }, resolvedVisualIndexSource?.id || ''),
         videoAnalysis: normalizeRouteForSource({
           ...aiModelRoutes.videoAnalysis,
-          mode: aiModelRoutes.videoAnalysis.mode === 'disabled' ? 'official' : aiModelRoutes.videoAnalysis.mode,
           sourceId: resolvedVideoAnalysisSource?.id || '',
           model: routeVideoAnalysisModel,
         }, resolvedVideoAnalysisSource?.id || ''),
@@ -5850,7 +5840,10 @@ export function Settings({
           { ...aiModelRoutes.voiceTts, sourceId: resolvedVoiceSource?.id || '', model: routeVoiceTtsModel },
           resolvedVoiceSource?.id || '',
         ),
-        voiceClone: { mode: 'official', sourceId: OFFICIAL_AUTO_SOURCE_ID, model: routeVoiceCloneModel },
+        voiceClone: normalizeRouteForSource(
+          { ...aiModelRoutes.voiceClone, sourceId: resolvedVoiceSource?.id || '', model: routeVoiceCloneModel },
+          resolvedVoiceSource?.id || '',
+        ),
       };
       const parsedParserTimeoutSeconds = Number(formData.parser_timeout_seconds);
       const parserTimeoutSeconds = Number.isFinite(parsedParserTimeoutSeconds)
@@ -5894,7 +5887,7 @@ export function Settings({
         visual_index_pdf_max_pages: visualIndexPdfMaxPages,
         visual_index_pdf_render_dpi: visualIndexPdfRenderDpi,
         visual_index_concurrency: visualIndexConcurrency,
-        video_analysis_enabled: true,
+        video_analysis_enabled: aiModelRoutes.videoAnalysis.mode !== 'disabled',
         video_analysis_endpoint: normalizedVideoAnalysisEndpoint,
         video_analysis_api_key: normalizedVideoAnalysisApiKey,
         video_analysis_model: routeVideoAnalysisModel,
@@ -6664,7 +6657,7 @@ export function Settings({
 	                      <div>
 	                        <h3 className="text-sm font-medium text-text-primary">聊天供应商</h3>
 	                        <p className="text-[11px] text-text-tertiary mt-1">
-	                          支持多供应商、多模型；聊天能力在下方单独选择官方或自定义路由。
+	                          支持多供应商、多模型；聊天、知识库等能力在下方分别选择自定义路由。
 	                        </p>
 	                      </div>
                       <div className="flex items-center gap-2">
@@ -7002,11 +6995,11 @@ export function Settings({
 	                      {renderCompactModelRouteRow(
 	                        '聊天',
 	                        renderCompactRouteControls('chat', [
-	                          { mode: 'official', label: '官方' },
+	                          { mode: 'disabled', label: '关闭' },
 	                          { mode: 'custom', label: '自定义', disabled: customAiSources.length === 0 },
 	                        ]),
-	                        aiModelRoutes.chat.mode === 'official'
-	                          ? renderOfficialRouteModelField('chat', '选择聊天模型')
+	                        aiModelRoutes.chat.mode === 'disabled'
+	                          ? <div className="text-xs text-text-tertiary">添加供应商后选择自定义模型。</div>
 	                          : renderCustomRouteFields(
 	                            aiModelRoutes.chat.sourceId || firstCustomAiSource?.id || '',
 	                            customAiSources,

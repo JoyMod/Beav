@@ -2415,7 +2415,7 @@ ipcMain.handle('db:save-settings', async (_, settings) => {
 })
 
 ipcMain.handle('db:get-settings', () => {
-  return getSettings()
+  return getSettings() || {}
 })
 
 ipcMain.handle('settings:pick-workspace-dir', async () => {
@@ -12275,7 +12275,7 @@ const buildWanderDeepAgentPrompt = (params: {
     : '';
 
   return [
-    '你现在处于 RedBox 的「漫步深度思考」Agent 模式。',
+    '你现在处于竹叶自媒体平台的「漫步深度思考」Agent 模式。',
     '你需要自主完成：分析素材 -> 发散选题 -> 收敛方向 -> 产出最终结构化结果。',
     '你必须先调用工具补充上下文，再给结论。',
     '',
@@ -14591,6 +14591,242 @@ import http from 'http'
 const HTTP_PORT = 23456;
 let httpServer: http.Server | null = null;
 
+const LOCAL_BROWSER_CHANNELS = new Set([
+  'db:get-settings',
+  'db:save-settings',
+  'spaces:list',
+  'spaces:create',
+  'spaces:rename',
+  'spaces:delete',
+  'spaces:switch',
+  'media:list',
+  'media:import-files',
+  'media:update',
+  'media:delete',
+  'media:bind',
+  'media:open',
+  'media:open-root',
+  'subjects:list',
+  'subjects:get',
+  'subjects:create',
+  'subjects:update',
+  'subjects:delete',
+  'subjects:search',
+  'subjects:categories:list',
+  'subjects:categories:create',
+  'subjects:categories:update',
+  'subjects:categories:delete',
+]);
+
+function isTrustedLocalBrowserUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' && ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isTrustedLocalBrowserRequest(req: http.IncomingMessage): boolean {
+  return isTrustedLocalBrowserUrl(req.headers.origin) || (
+    !req.headers.origin && isTrustedLocalBrowserUrl(req.headers.referer)
+  );
+}
+
+function readLocalBrowserJson(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    let size = 0;
+    let settled = false;
+    req.setEncoding('utf8');
+    req.on('data', (chunk: string) => {
+      if (settled) return;
+      size += Buffer.byteLength(chunk);
+      if (size > 32 * 1024 * 1024) {
+        settled = true;
+        reject(new Error('Request body is too large'));
+        return;
+      }
+      body += chunk;
+    });
+    req.on('end', () => {
+      if (settled) return;
+      try {
+        const parsed = JSON.parse(body || '{}');
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Request body must be an object');
+        }
+        resolve(parsed as Record<string, unknown>);
+      } catch (error) {
+        reject(error);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function localBrowserMediaUrl(assetId: string): string {
+  return `http://127.0.0.1:${HTTP_PORT}/api/local/media/${encodeURIComponent(assetId)}`;
+}
+
+function exposeSubjectToLocalBrowser(subject: Awaited<ReturnType<typeof getSubject>>) {
+  const imageUrls = (subject.absoluteImagePaths || []).map((_, index) => (
+    `http://127.0.0.1:${HTTP_PORT}/api/local/subjects/${encodeURIComponent(subject.id)}/image/${index}`
+  ));
+  return {
+    ...subject,
+    previewUrls: imageUrls,
+    primaryPreviewUrl: imageUrls[0],
+    voicePreviewUrl: subject.absoluteVoicePath
+      ? `http://127.0.0.1:${HTTP_PORT}/api/local/subjects/${encodeURIComponent(subject.id)}/voice/0`
+      : undefined,
+    videoPreviewUrl: subject.absoluteVideoPath
+      ? `http://127.0.0.1:${HTTP_PORT}/api/local/subjects/${encodeURIComponent(subject.id)}/video/0`
+      : undefined,
+  };
+}
+
+async function invokeLocalBrowserDataChannel(channel: string, rawPayload: unknown): Promise<unknown> {
+  if (!LOCAL_BROWSER_CHANNELS.has(channel)) {
+    throw new Error(`Local browser channel is not allowed: ${channel}`);
+  }
+  const payload = (rawPayload && typeof rawPayload === 'object' ? rawPayload : {}) as Record<string, any>;
+  try {
+    switch (channel) {
+      case 'db:get-settings':
+        return getSettings() || {};
+      case 'db:save-settings': {
+        const normalized = normalizeSettingsInput(payload) as Parameters<typeof saveSettings>[0];
+        const result = saveSettings(normalized);
+        setDebugLoggingEnabled(Boolean(normalized.debug_log_enabled));
+        await applyGlobalNetworkProxy((getSettings() || {}) as Record<string, unknown>);
+        broadcastSettingsUpdated();
+        return result;
+      }
+      case 'spaces:list':
+        return { spaces: listSpaces(), activeSpaceId: getActiveSpaceId() };
+      case 'spaces:create': {
+        const space = createSpace(String(rawPayload || ''));
+        await ensureWorkspaceStructureFor(getWorkspacePathsForSpace(space.id));
+        return { success: true, space };
+      }
+      case 'spaces:rename': {
+        const space = renameSpace(String(payload.id || ''), String(payload.name || ''));
+        return space ? { success: true, space } : { success: false, error: '空间不存在或名称无效' };
+      }
+      case 'spaces:delete': {
+        const spaceId = String(rawPayload || '');
+        const result = deleteSpace(spaceId);
+        await fs.rm(getWorkspacePathsForSpace(spaceId).base, { recursive: true, force: true });
+        if (result.deletedActiveSpace) {
+          await ensureWorkspaceStructureFor(getWorkspacePaths());
+          await refreshForSpaceChange();
+        }
+        return { success: true, ...result };
+      }
+      case 'spaces:switch': {
+        const space = setActiveSpace(String(rawPayload || ''));
+        await ensureWorkspaceStructureFor(getWorkspacePaths());
+        await refreshForSpaceChange();
+        return { success: true, space };
+      }
+      case 'media:list': {
+        const limit = Math.max(1, Math.min(500, Number(payload.limit || 300) || 300));
+        const cursor = Math.max(0, Number(payload.cursor || 0) || 0);
+        const assets = await listMediaAssets(5000);
+        const pageAssets = await Promise.all(assets.slice(cursor, cursor + limit).map(async (asset) => {
+          const enriched = await enrichMediaAsset(asset);
+          return enriched.exists ? { ...enriched, previewUrl: localBrowserMediaUrl(asset.id) } : enriched;
+        }));
+        const nextCursor = cursor + limit < assets.length ? String(cursor + limit) : null;
+        return { success: true, assets: pageAssets, total: assets.length, nextCursor, hasMore: Boolean(nextCursor) };
+      }
+      case 'media:import-files': {
+        const picker = await dialog.showOpenDialog({
+          title: '选择要导入到草稿媒体库的素材',
+          properties: ['openFile', 'multiSelections'],
+          filters: [
+            { name: 'Media Files', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg', 'mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv', 'mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'opus'] },
+            { name: 'All Files', extensions: ['*'] },
+          ],
+        });
+        if (picker.canceled || !picker.filePaths.length) return { success: true, canceled: true, imported: [] };
+        const imported = await importMediaFiles(picker.filePaths);
+        const enriched = await Promise.all(imported.map(async (asset) => ({
+          ...await enrichMediaAsset(asset),
+          previewUrl: localBrowserMediaUrl(asset.id),
+        })));
+        emitRendererDataChanged('media', { action: 'import' });
+        return { success: true, imported: enriched, added: enriched.length };
+      }
+      case 'media:update': {
+        if (!payload.assetId) return { success: false, error: 'assetId is required' };
+        const asset = await enrichMediaAsset(await updateMediaAssetMetadata({
+          assetId: String(payload.assetId),
+          projectId: payload.projectId,
+          title: payload.title,
+          prompt: payload.prompt,
+        }));
+        return { success: true, asset: { ...asset, previewUrl: localBrowserMediaUrl(String(payload.assetId)) } };
+      }
+      case 'media:delete':
+        return { success: true, deleted: await deleteMediaAsset(String(payload.assetId || '')) };
+      case 'media:bind': {
+        const manuscriptPath = normalizeRelativePath(String(payload.manuscriptPath || ''));
+        await fs.access(path.join(getWorkspacePaths().manuscripts, manuscriptPath));
+        const asset = await bindMediaAssetToManuscript({
+          assetId: String(payload.assetId || ''),
+          manuscriptPath,
+          role: payload.role,
+        });
+        return { success: true, asset: await enrichMediaAsset(asset) };
+      }
+      case 'media:open': {
+        const asset = (await listMediaAssets(5000)).find((item) => item.id === String(payload.assetId || ''));
+        if (!asset) return { success: false, error: 'Media asset not found' };
+        const openError = await shell.openPath(asset.relativePath ? getAbsoluteMediaPath(asset.relativePath) : getWorkspacePaths().media);
+        return openError ? { success: false, error: openError } : { success: true };
+      }
+      case 'media:open-root': {
+        const openError = await shell.openPath(getWorkspacePaths().media);
+        return openError ? { success: false, error: openError } : { success: true };
+      }
+      case 'subjects:list': {
+        const subjects = await listSubjects(Number(payload.limit || 500));
+        return { success: true, subjects: subjects.map(exposeSubjectToLocalBrowser) };
+      }
+      case 'subjects:get':
+        return { success: true, subject: exposeSubjectToLocalBrowser(await getSubject(String(payload.id || ''))) };
+      case 'subjects:create':
+        return { success: true, subject: exposeSubjectToLocalBrowser(await createSubject(payload as any)) };
+      case 'subjects:update':
+        return { success: true, subject: exposeSubjectToLocalBrowser(await updateSubject(payload as any)) };
+      case 'subjects:delete':
+        await deleteSubject(String(payload.id || ''));
+        return { success: true };
+      case 'subjects:search': {
+        const subjects = await searchSubjects(String(payload.query || ''), {
+          categoryId: payload.categoryId,
+          limit: Number(payload.limit || 50),
+        });
+        return { success: true, subjects: subjects.map(exposeSubjectToLocalBrowser) };
+      }
+      case 'subjects:categories:list':
+        return { success: true, categories: await listSubjectCategories() };
+      case 'subjects:categories:create':
+        return { success: true, category: await createSubjectCategory(String(payload.name || '')) };
+      case 'subjects:categories:update':
+        return { success: true, category: await updateSubjectCategory({ id: String(payload.id || ''), name: String(payload.name || '') }) };
+      case 'subjects:categories:delete':
+        await deleteSubjectCategory(String(payload.id || ''));
+        return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 async function persistXhsNote(note: any): Promise<{ success: boolean; noteId?: string; error?: string }> {
   const fs = require('fs/promises');
   try {
@@ -15011,6 +15247,75 @@ function startHttpServer() {
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
       res.end();
+      return;
+    }
+
+    const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${HTTP_PORT}`);
+
+    if (req.method === 'POST' && requestUrl.pathname === '/api/local/invoke') {
+      if (!isTrustedLocalBrowserRequest(req)) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Local browser origin is not allowed' }));
+        return;
+      }
+      if (!String(req.headers['content-type'] || '').toLowerCase().startsWith('application/json')) {
+        res.writeHead(415, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Content-Type must be application/json' }));
+        return;
+      }
+      try {
+        const body = await readLocalBrowserJson(req);
+        const channel = String(body.channel || '');
+        const result = await invokeLocalBrowserDataChannel(channel, body.payload);
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }));
+      }
+      return;
+    }
+
+    const localMediaMatch = requestUrl.pathname.match(/^\/api\/local\/media\/([^/]+)$/);
+    const localSubjectMediaMatch = requestUrl.pathname.match(/^\/api\/local\/subjects\/([^/]+)\/(image|voice|video)\/(\d+)$/);
+    if (req.method === 'GET' && (localMediaMatch || localSubjectMediaMatch)) {
+      if (!isTrustedLocalBrowserRequest(req)) {
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
+      }
+      try {
+        let filePath = '';
+        let contentType = 'application/octet-stream';
+        if (localMediaMatch) {
+          const assetId = decodeURIComponent(localMediaMatch[1]);
+          const asset = (await listMediaAssets(5000)).find((item) => item.id === assetId);
+          if (!asset?.relativePath) throw new Error('Media asset not found');
+          filePath = getAbsoluteMediaPath(asset.relativePath);
+          contentType = asset.mimeType || mimeTypeForPreviewExtension(path.extname(filePath).slice(1));
+        } else if (localSubjectMediaMatch) {
+          const subject = await getSubject(decodeURIComponent(localSubjectMediaMatch[1]));
+          const kind = localSubjectMediaMatch[2];
+          const index = Number(localSubjectMediaMatch[3]);
+          filePath = kind === 'image'
+            ? String(subject.absoluteImagePaths?.[index] || '')
+            : kind === 'voice'
+              ? String(subject.absoluteVoicePath || '')
+              : String(subject.absoluteVideoPath || '');
+          if (!filePath) throw new Error('Subject media not found');
+          contentType = mimeTypeForPreviewExtension(path.extname(filePath).slice(1));
+        }
+        const content = await fs.readFile(filePath);
+        res.writeHead(200, {
+          'Content-Type': contentType,
+          'Content-Length': content.length,
+          'Cache-Control': 'private, max-age=60',
+        });
+        res.end(content);
+      } catch (error) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }));
+      }
       return;
     }
 
