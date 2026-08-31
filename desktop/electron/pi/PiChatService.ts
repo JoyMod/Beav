@@ -775,6 +775,7 @@ export class PiChatService {
           maxTimeMinutes,
           temperature,
           toolPack: 'redclaw',
+          toolNames: preparedExecution.route.intent === 'direct_answer' ? [] : undefined,
           runtimeMode,
           interactive: true,
           requiresHumanApproval: preparedExecution.route.requiresHumanApproval,
@@ -921,8 +922,7 @@ export class PiChatService {
     if (this.shouldHandleRedClawOnboarding(metadata)) {
       try {
         redClawProfileBundle = await loadRedClawProfilePromptBundle();
-        const isFirstRedClawTurn = this.isFirstAssistantTurn(sessionId);
-        if (allowInteractiveOnboarding && isFirstRedClawTurn) {
+        if (allowInteractiveOnboarding) {
           const onboarding = await handleRedClawOnboardingTurn(content);
           if (onboarding.handled) {
             return {
@@ -931,7 +931,7 @@ export class PiChatService {
             };
           }
         }
-        if (!redClawProfileBundle.onboardingState.completedAt) {
+        if (!allowInteractiveOnboarding && !redClawProfileBundle.onboardingState.completedAt) {
           await ensureRedClawOnboardingCompletedWithDefaults();
         }
         redClawProfileBundle = await loadRedClawProfilePromptBundle();
@@ -1038,12 +1038,6 @@ export class PiChatService {
       role: 'assistant',
       content: text,
     });
-  }
-
-  private isFirstAssistantTurn(sessionId: string): boolean {
-    const history = getChatMessages(sessionId).filter((msg) => msg.role === 'user' || msg.role === 'assistant');
-    const assistantCount = history.filter((msg) => msg.role === 'assistant').length;
-    return assistantCount === 0 && history.length <= 1;
   }
 
   private shouldHandleRedClawOnboarding(metadata: SessionMetadata): boolean {
@@ -2676,7 +2670,7 @@ export class PiChatService {
         this.traceActiveExecution(`runtime.${event.phase}`, { content: event.content }, event.phase === 'tooling' ? 'execute_tools' : 'plan');
         break;
       case 'response_chunk':
-        this.setRuntimeState({ partialResponse: event.content });
+        this.setRuntimeState({ partialResponse: `${this.runtimeState.partialResponse}${event.content}` });
         this.sendToUI('chat:response-chunk', { content: event.content });
         break;
       case 'response_end':

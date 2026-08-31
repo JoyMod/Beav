@@ -13,7 +13,7 @@ import type {
 } from './types';
 
 const DEFAULT_INTENT_BY_MODE: Record<RuntimeMode, IntentRoute['intent']> = {
-  redclaw: 'manuscript_creation',
+  redclaw: 'direct_answer',
   knowledge: 'knowledge_retrieval',
   chatroom: 'discussion',
   'advisor-discussion': 'discussion',
@@ -87,7 +87,8 @@ const extractHints = (context: RuntimeContext) => {
   };
 };
 
-const inferIntent = (runtimeMode: RuntimeMode, hints: ReturnType<typeof extractHints>): IntentName => {
+const inferIntent = (context: RuntimeContext, hints: ReturnType<typeof extractHints>): IntentName => {
+  const runtimeMode = context.runtimeMode;
   if (hints.forcedIntent) return hints.forcedIntent;
   if (runtimeMode === 'background-maintenance') return 'automation';
   if (runtimeMode === 'knowledge') return 'knowledge_retrieval';
@@ -108,7 +109,9 @@ const inferIntent = (runtimeMode: RuntimeMode, hints: ReturnType<typeof extractH
     return 'direct_answer';
   }
 
-  return 'manuscript_creation';
+  return /(?:写|创作|生成|制作|保存|新建|创建|编辑|修改|改写|润色|整理|导出|发布|做一篇|写一篇)/.test(String(context.userInput || ''))
+    ? 'manuscript_creation'
+    : 'direct_answer';
 };
 
 const inferRoleForIntent = (runtimeMode: RuntimeMode, intent: IntentName): RoleId => {
@@ -167,7 +170,7 @@ const shouldTriggerLongRunning = (params: {
 const buildDirectRoute = (context: RuntimeContext): IntentRoute => {
   const runtimeMode = context.runtimeMode;
   const hints = extractHints(context);
-  const intent = inferIntent(runtimeMode, hints);
+  const intent = inferIntent(context, hints);
   const recommendedRole = resolveRecommendedRole(runtimeMode, intent, hints);
   const requiresMultiAgent = shouldTriggerMultiAgent({
     runtimeMode,
@@ -184,7 +187,9 @@ const buildDirectRoute = (context: RuntimeContext): IntentRoute => {
     secondaryIntents: [],
     goal: String(context.userInput || '').trim() || '处理当前用户请求',
     deliverables: [],
-    requiredCapabilities: DEFAULT_CAPABILITIES_BY_MODE[runtimeMode],
+    requiredCapabilities: intent === 'direct_answer'
+      ? ['direct-answer']
+      : DEFAULT_CAPABILITIES_BY_MODE[runtimeMode],
     recommendedRole,
     requiresLongRunningTask,
     requiresMultiAgent,

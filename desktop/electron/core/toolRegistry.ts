@@ -361,8 +361,9 @@ export class ToolRegistry {
      * 获取 OpenAI 兼容的工具 Schema 列表
      * 返回格式兼容 OpenAI Chat Completion API
      */
-    getToolSchemas() {
-        return this.getAllTools().map(tool => {
+    getToolSchemas(toolNames?: string[]) {
+        const allowed = toolNames ? new Set(toolNames) : null;
+        return this.getAllTools().filter(tool => !allowed || allowed.has(tool.name)).map(tool => {
             if (tool instanceof DeclarativeTool) {
                 return tool.getFunctionSchema();
             }

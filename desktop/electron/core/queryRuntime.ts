@@ -30,6 +30,7 @@ type LlmToolCall = {
 type LlmResponse = {
   content: string;
   toolCalls: LlmToolCall[];
+  streamedContent?: boolean;
   finishReason?: string;
   usage?: {
     promptTokens?: number;
@@ -469,7 +470,7 @@ export class QueryRuntime {
 
       responseText = llmResponse.content || '';
       this.adapter.onEvent({ type: 'thinking', phase: 'respond', content: `Turn ${turnCount}: preparing final response` });
-      if (responseText) {
+      if (responseText && !llmResponse.streamedContent) {
         this.adapter.onEvent({ type: 'response_chunk', content: responseText });
       }
       const shouldContinueForLength =
@@ -555,6 +556,8 @@ export class QueryRuntime {
   }
 
   private async callLlm(messages: RuntimeMessage[]): Promise<LlmResponse> {
+    const startedAt = now();
+    const toolSchemas = this.registry.getToolSchemas(this.config.toolNames);
     const response = await fetch(safeUrlJoin(normalizeApiBaseUrl(this.config.baseURL), '/chat/completions'), {
       method: 'POST',
       headers: {
@@ -566,7 +569,8 @@ export class QueryRuntime {
         model: this.config.model,
         temperature: this.config.temperature ?? 0.5,
         messages,
-        tools: this.registry.getToolSchemas(),
+        stream: true,
+        ...(toolSchemas.length > 0 ? { tools: toolSchemas } : {}),
       }),
     });
 
@@ -575,7 +579,7 @@ export class QueryRuntime {
       throw new Error(`Runtime LLM error (${response.status}): ${errorText || response.statusText}`);
     }
 
-    const data = await response.json() as {
+    const decodeJsonResponse = (data: {
       usage?: {
         prompt_tokens?: number;
         completion_tokens?: number;
@@ -588,31 +592,132 @@ export class QueryRuntime {
           tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }>;
         };
       }>;
+    }): LlmResponse => {
+      const message = data?.choices?.[0]?.message;
+      return {
+        content: extractAssistantText(message?.content),
+        toolCalls: Array.isArray(message?.tool_calls)
+          ? message!.tool_calls!.map((toolCall) => ({
+              id: String(toolCall.id || nextId('tool')),
+              name: String(toolCall.function?.name || ''),
+              args: (() => {
+                try {
+                  return JSON.parse(String(toolCall.function?.arguments || '{}')) as Record<string, unknown>;
+                } catch {
+                  return {};
+                }
+              })(),
+            })).filter((toolCall) => toolCall.name)
+          : [],
+        finishReason: typeof data?.choices?.[0]?.finish_reason === 'string'
+          ? data.choices?.[0]?.finish_reason
+          : undefined,
+        usage: data?.usage ? {
+          promptTokens: data.usage.prompt_tokens,
+          completionTokens: data.usage.completion_tokens,
+          totalTokens: data.usage.total_tokens,
+        } : undefined,
+      };
     };
-    const message = data?.choices?.[0]?.message;
+
+    if (!response.body || !String(response.headers.get('content-type') || '').toLowerCase().includes('text/event-stream')) {
+      return decodeJsonResponse(await response.json());
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    const toolCalls = new Map<number, { id: string; name: string; arguments: string }>();
+    let buffer = '';
+    let content = '';
+    let finishReason: string | undefined;
+    let streamedContent = false;
+    let firstDeltaLogged = false;
+
+    const processLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) return;
+      const payload = trimmed.slice(5).trim();
+      if (!payload || payload === '[DONE]') return;
+
+      const event = JSON.parse(payload) as {
+        choices?: Array<{
+          finish_reason?: string;
+          delta?: {
+            content?: string;
+            tool_calls?: Array<{
+              index?: number;
+              id?: string;
+              function?: { name?: string; arguments?: string };
+            }>;
+          };
+        }>;
+      };
+      const choice = event.choices?.[0];
+      const delta = choice?.delta;
+      if (typeof choice?.finish_reason === 'string') {
+        finishReason = choice.finish_reason;
+      }
+      for (const fragment of delta?.tool_calls || []) {
+        const index = Number(fragment.index || 0);
+        const current = toolCalls.get(index) || { id: '', name: '', arguments: '' };
+        current.id = fragment.id || current.id;
+        current.name += fragment.function?.name || '';
+        current.arguments += fragment.function?.arguments || '';
+        toolCalls.set(index, current);
+      }
+      if (delta?.content) {
+        content += delta.content;
+        if (toolCalls.size > 0) {
+          this.adapter.onEvent({ type: 'thinking', phase: 'tooling', content: delta.content });
+        } else {
+          streamedContent = true;
+          this.adapter.onEvent({ type: 'response_chunk', content: delta.content });
+        }
+        if (!firstDeltaLogged) {
+          firstDeltaLogged = true;
+          console.log('[QueryRuntime] llm:first-delta', {
+            sessionId: this.config.sessionId,
+            model: this.config.model,
+            elapsedMs: now() - startedAt,
+            toolCount: toolSchemas.length,
+          });
+        }
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+      for (const line of lines) processLine(line);
+      if (done) break;
+    }
+    if (buffer.trim()) processLine(buffer);
+
+    console.log('[QueryRuntime] llm:completed', {
+      sessionId: this.config.sessionId,
+      model: this.config.model,
+      elapsedMs: now() - startedAt,
+      toolCount: toolSchemas.length,
+      returnedToolCalls: toolCalls.size,
+    });
+
     return {
-      content: extractAssistantText(message?.content),
-      toolCalls: Array.isArray(message?.tool_calls)
-        ? message!.tool_calls!.map((toolCall) => ({
-            id: String(toolCall.id || nextId('tool')),
-            name: String(toolCall.function?.name || ''),
-            args: (() => {
-              try {
-                return JSON.parse(String(toolCall.function?.arguments || '{}')) as Record<string, unknown>;
-              } catch {
-                return {};
-              }
-            })(),
-          })).filter((toolCall) => toolCall.name)
-        : [],
-      finishReason: typeof data?.choices?.[0]?.finish_reason === 'string'
-        ? data.choices?.[0]?.finish_reason
-        : undefined,
-      usage: data?.usage ? {
-        promptTokens: data.usage.prompt_tokens,
-        completionTokens: data.usage.completion_tokens,
-        totalTokens: data.usage.total_tokens,
-      } : undefined,
+      content,
+      streamedContent,
+      finishReason,
+      toolCalls: Array.from(toolCalls.entries()).sort(([left], [right]) => left - right).map(([, toolCall]) => ({
+        id: toolCall.id || nextId('tool'),
+        name: toolCall.name,
+        args: (() => {
+          try {
+            return JSON.parse(toolCall.arguments || '{}') as Record<string, unknown>;
+          } catch {
+            return {};
+          }
+        })(),
+      })).filter((toolCall) => toolCall.name),
     };
   }
 
