@@ -75,11 +75,6 @@ import type {
   ThrivePluginSummary,
 } from '../types';
 import {
-  REDBOX_OFFICIAL_VIDEO_BASE_URL,
-  REDBOX_OFFICIAL_VIDEO_MODEL_LIST,
-  REDBOX_OFFICIAL_VIDEO_MODELS,
-} from '../../shared/redboxVideo';
-import {
   isRedClawOnboardingCompleted,
   type RedclawOnboardingState,
 } from './redclaw/onboardingState';
@@ -947,7 +942,7 @@ export function Settings({
     voice_clone_model: DEFAULT_VOICE_CLONE_MODEL,
     video_endpoint: '',
     video_api_key: '',
-    video_model: String(REDBOX_OFFICIAL_VIDEO_MODELS['text-to-video']),
+    video_model: '',
     image_provider_template: 'openai-images',
     image_aspect_ratio: '3:4',
     image_size: '',
@@ -4033,9 +4028,9 @@ export function Settings({
           voice_tts_model: loadedVoiceTtsModel,
           tts_model: loadedVoiceTtsModel,
           voice_clone_model: loadedVoiceCloneModel,
-          video_endpoint: REDBOX_OFFICIAL_VIDEO_BASE_URL,
+          video_endpoint: settings.video_endpoint || '',
           video_api_key: settings.video_api_key || '',
-          video_model: settings.video_model || REDBOX_OFFICIAL_VIDEO_MODELS['text-to-video'],
+          video_model: settings.video_model || '',
           image_aspect_ratio: settings.image_aspect_ratio || '3:4',
           image_size: '',
           image_quality: settings.image_quality === 'low' || settings.image_quality === 'medium' || settings.image_quality === 'high' ? settings.image_quality : 'medium',
@@ -5683,9 +5678,7 @@ export function Settings({
         resolvedVoiceTtsModel,
         String(formData.voice_clone_model || aiModelRoutes.voiceClone.model || DEFAULT_VOICE_CLONE_MODEL).trim(),
       );
-      const resolvedVideoModel = REDBOX_OFFICIAL_VIDEO_MODEL_LIST.includes(String(formData.video_model || '').trim() as typeof REDBOX_OFFICIAL_VIDEO_MODEL_LIST[number])
-        ? String(formData.video_model || '').trim()
-        : REDBOX_OFFICIAL_VIDEO_MODELS['text-to-video'];
+      const resolvedVideoModel = String(formData.video_model || '').trim();
       const selectedImageModel = String(resolvedImageModel || '').trim();
       if (aiModelRoutes.image.mode !== 'disabled' && !selectedImageModel) {
         throw new Error('请填写生图模型（可手动输入或从列表选择）');
@@ -5931,7 +5924,7 @@ export function Settings({
         voice_tts_model: routeVoiceTtsModel,
         tts_model: routeVoiceTtsModel,
         voice_clone_model: routeVoiceCloneModel,
-        video_endpoint: REDBOX_OFFICIAL_VIDEO_BASE_URL,
+        video_endpoint: String(formData.video_endpoint || '').trim(),
         video_api_key: String(formData.video_api_key || formData.api_key || '').trim(),
         video_model: resolvedVideoModel,
         ai_model_routes_json: JSON.stringify(normalizedModelRoutes),
@@ -7317,19 +7310,35 @@ export function Settings({
                   </div>
 
                   <div className="pt-4 border-t border-border space-y-3">
-                    <h3 className="text-sm font-medium text-text-primary">生视频模型设置</h3>
+                    <h3 className="text-sm font-medium text-text-primary">生视频供应商</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
-                          <div className="text-[11px] text-text-tertiary mb-1">文生视频</div>
-                          <div className="text-sm font-medium text-text-primary">{REDBOX_OFFICIAL_VIDEO_MODELS['text-to-video']}</div>
+                          <label className="block text-[11px] text-text-tertiary mb-1">Endpoint</label>
+                          <input
+                            value={formData.video_endpoint}
+                            onChange={(e) => setFormData((d) => ({ ...d, video_endpoint: e.target.value }))}
+                            placeholder="https://ark.cn-beijing.volces.com/api/v3"
+                            className="w-full rounded border border-border bg-surface-secondary/30 px-3 py-2 text-sm transition-colors focus:border-accent-primary focus:outline-none"
+                          />
                         </div>
                         <div>
-                          <div className="text-[11px] text-text-tertiary mb-1">参考图视频</div>
-                          <div className="text-sm font-medium text-text-primary">{REDBOX_OFFICIAL_VIDEO_MODELS['reference-guided']}</div>
+                          <label className="block text-[11px] text-text-tertiary mb-1">模型</label>
+                          <input
+                            value={formData.video_model}
+                            onChange={(e) => setFormData((d) => ({ ...d, video_model: e.target.value }))}
+                            placeholder="doubao-seedance-2-0-mini-260615"
+                            className="w-full rounded border border-border bg-surface-secondary/30 px-3 py-2 text-sm transition-colors focus:border-accent-primary focus:outline-none"
+                          />
                         </div>
                         <div>
-                          <div className="text-[11px] text-text-tertiary mb-1">图片/首尾帧视频</div>
-                          <div className="text-sm font-medium text-text-primary">{REDBOX_OFFICIAL_VIDEO_MODELS['first-last-frame']}</div>
+                          <label className="block text-[11px] text-text-tertiary mb-1">API Key</label>
+                          <input
+                            type="password"
+                            value={formData.video_api_key}
+                            onChange={(e) => setFormData((d) => ({ ...d, video_api_key: e.target.value }))}
+                            placeholder="本机安全存储"
+                            className="w-full rounded border border-border bg-surface-secondary/30 px-3 py-2 text-sm transition-colors focus:border-accent-primary focus:outline-none"
+                          />
                         </div>
                     </div>
                   </div>

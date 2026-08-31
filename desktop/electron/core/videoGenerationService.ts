@@ -48,8 +48,15 @@ const VIDEO_TASK_POLL_INTERVAL_MS = 3000;
 const VIDEO_TASK_POLL_TIMEOUT_MS = 6 * 60 * 1000;
 
 function isRedBoxCompatibleEndpoint(endpoint: string): boolean {
-    void endpoint;
-    return false;
+    return /\/redbox\//i.test(String(endpoint || '').trim());
+}
+
+function isArkEndpoint(endpoint: string): boolean {
+    try {
+        return new URL(endpoint).hostname.toLowerCase().endsWith('volces.com');
+    } catch {
+        return false;
+    }
 }
 
 function normalizeVideoAspectRatio(value: string): '16:9' | '9:16' {
@@ -200,7 +207,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 function extractTaskId(payload: any): string {
-    const direct = String(payload?.task_id || payload?.taskId || '').trim();
+    const direct = String(payload?.id || payload?.task_id || payload?.taskId || '').trim();
     if (direct) return direct;
     const data = payload?.data;
     if (data && typeof data === 'object' && !Array.isArray(data)) {
@@ -254,6 +261,11 @@ function extractCompatibleVideoUrls(payload: any): string[] {
     pushUrl(output.video_url);
     pushUrl(output.video);
     pushUrl(output.url);
+    pushUrl(output.output_url);
+    if (output.content && typeof output.content === 'object' && !Array.isArray(output.content)) {
+        pushUrl(output.content.video_url);
+        pushUrl(output.content.url);
+    }
     const dataRows = Array.isArray(output.data) ? output.data : [];
     for (const item of dataRows) {
         if (typeof item === 'string') {
@@ -266,6 +278,121 @@ function extractCompatibleVideoUrls(payload: any): string[] {
         pushUrl((item as Record<string, unknown>).url);
     }
     return urls;
+}
+
+function buildArkContentGenerationUrl(endpoint: string, taskId?: string): string {
+    const normalized = normalizeApiBaseUrl(endpoint).replace(/\/+$/, '');
+    const base = /\/contents\/generations\/tasks$/i.test(normalized)
+        ? normalized
+        : `${normalized}/contents/generations/tasks`;
+    return taskId ? `${base}/${encodeURIComponent(taskId)}` : base;
+}
+
+async function generateViaArkContentGeneration(input: {
+    prompt: string;
+    endpoint: string;
+    apiKey: string;
+    model: string;
+    count: number;
+    aspectRatio: '16:9' | '9:16';
+    resolution: '720p' | '1080p';
+    durationSeconds: number;
+    generateAudio: boolean;
+    title?: string;
+    projectId?: string;
+    referenceImages?: string[];
+    generationMode?: VideoGenerationMode;
+}): Promise<GenerateVideosResult> {
+    const refs = Array.isArray(input.referenceImages) ? input.referenceImages.filter(Boolean) : [];
+    const content: Array<Record<string, unknown>> = [{ type: 'text', text: input.prompt }];
+    for (let index = 0; index < refs.length; index += 1) {
+        const url = await normalizeMediaValueForRemote(refs[index]);
+        if (!url) continue;
+        content.push({
+            type: 'image_url',
+            image_url: { url },
+            role: input.generationMode === 'first-last-frame'
+                ? (index === 0 ? 'first_frame' : 'last_frame')
+                : (index === 0 ? 'first_frame' : 'reference_image'),
+        });
+    }
+
+    const assets: MediaAsset[] = [];
+    for (let index = 0; index < input.count; index += 1) {
+        const createResponse = await fetch(buildArkContentGenerationUrl(input.endpoint), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${input.apiKey}`,
+            },
+            body: JSON.stringify({
+                model: input.model,
+                content,
+                ratio: input.aspectRatio,
+                resolution: input.resolution,
+                duration: input.durationSeconds,
+                generate_audio: input.generateAudio,
+            }),
+        });
+        const created = await createResponse.json().catch(() => ({}));
+        if (!createResponse.ok) {
+            throw new Error(`方舟生视频任务创建失败 (${createResponse.status}): ${extractTaskFailureMessage(created) || createResponse.statusText}`);
+        }
+        const taskId = extractTaskId(created);
+        if (!taskId) {
+            throw new Error('方舟生视频任务创建成功，但没有返回任务 ID。');
+        }
+
+        const deadline = Date.now() + VIDEO_TASK_POLL_TIMEOUT_MS;
+        let task = created;
+        while (Date.now() < deadline) {
+            const status = extractTaskStatus(task);
+            if (status === 'SUCCEEDED') break;
+            if (status === 'FAILED' || status === 'CANCELLED') {
+                throw new Error(`方舟生视频任务失败：${extractTaskFailureMessage(task) || status}`);
+            }
+            await sleep(VIDEO_TASK_POLL_INTERVAL_MS);
+            const queryResponse = await fetch(buildArkContentGenerationUrl(input.endpoint, taskId), {
+                headers: { Authorization: `Bearer ${input.apiKey}` },
+            });
+            task = await queryResponse.json().catch(() => ({}));
+            if (!queryResponse.ok) {
+                throw new Error(`方舟生视频任务查询失败 (${queryResponse.status}): ${extractTaskFailureMessage(task) || queryResponse.statusText}`);
+            }
+        }
+
+        if (extractTaskStatus(task) !== 'SUCCEEDED') {
+            throw new Error(`方舟生视频任务超时，task_id=${taskId}`);
+        }
+        const videoUrl = extractCompatibleVideoUrls(task)[0];
+        if (!videoUrl) {
+            throw new Error('方舟生视频任务已完成，但没有返回视频地址。');
+        }
+        const downloaded = await fetchGeneratedVideoBuffer(videoUrl, input.apiKey);
+        assets.push(await createGeneratedMediaAsset({
+            prompt: input.prompt,
+            dataBuffer: downloaded.buffer,
+            mimeType: downloaded.mimeType,
+            projectId: input.projectId?.trim() || undefined,
+            provider: 'ark',
+            model: input.model,
+            aspectRatio: input.aspectRatio,
+            size: input.resolution,
+            quality: `${input.durationSeconds}s`,
+            title: input.title?.trim() || undefined,
+        }));
+    }
+
+    return {
+        model: input.model,
+        endpoint: input.endpoint,
+        provider: 'ark',
+        aspectRatio: input.aspectRatio,
+        resolution: input.resolution,
+        durationSeconds: input.durationSeconds,
+        generateAudio: input.generateAudio,
+        assets,
+    };
 }
 
 async function generateViaOpenAiCompatibleVideoRoute(input: {
@@ -548,9 +675,7 @@ export async function generateVideosToMediaLibrary(input: GenerateVideosInput): 
     const settings = (getSettings() || {}) as Record<string, unknown>;
     const generationMode = String(input.generationMode || '').trim() as VideoGenerationMode;
     const endpoint = normalizeApiBaseUrl(
-        String(
-            REDBOX_OFFICIAL_VIDEO_BASE_URL
-        ).trim(),
+        String(input.endpoint || settings.video_endpoint || REDBOX_OFFICIAL_VIDEO_BASE_URL).trim(),
         REDBOX_OFFICIAL_VIDEO_BASE_URL
     );
     const inputApiKey = String(input.apiKey || '').trim();
@@ -574,16 +699,20 @@ export async function generateVideosToMediaLibrary(input: GenerateVideosInput): 
         : [];
     const drivingAudio = String(input.drivingAudio || '').trim();
     const firstClip = String(input.firstClip || '').trim();
-    const model = getRedBoxOfficialVideoModel(generationMode || 'text-to-video');
+    const model = String(
+        input.model
+        || settings.video_model
+        || getRedBoxOfficialVideoModel(generationMode || 'text-to-video')
+    ).trim();
 
     if (!endpoint) {
-        throw new Error('个人本地版暂未接通生视频供应商；当前请先使用文本对话能力。');
+        throw new Error('生视频 Endpoint 未配置。');
     }
     if (!apiKey) {
         throw new Error('生视频 API Key 未配置。请先登录或配置竹叶自媒体平台官方 AI 源。');
     }
-    if (!isRedBoxCompatibleEndpoint(endpoint)) {
-        throw new Error('个人本地版暂未接通生视频供应商；当前请先使用文本对话能力。');
+    if (!model) {
+        throw new Error('生视频模型未配置。');
     }
     console.log('[VideoGeneration] auth prepared', {
         endpoint,
@@ -603,6 +732,24 @@ export async function generateVideosToMediaLibrary(input: GenerateVideosInput): 
     }
     if (generationMode === 'continuation' && !firstClip) {
         throw new Error('视频续写模式需要 1 段起始视频。');
+    }
+
+    if (isArkEndpoint(endpoint)) {
+        return generateViaArkContentGeneration({
+            prompt,
+            endpoint,
+            apiKey,
+            model,
+            count,
+            aspectRatio,
+            resolution,
+            durationSeconds,
+            generateAudio,
+            title: input.title,
+            projectId: input.projectId,
+            referenceImages,
+            generationMode,
+        });
     }
 
     return generateViaOpenAiCompatibleVideoRoute({

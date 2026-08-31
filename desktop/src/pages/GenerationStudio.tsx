@@ -23,7 +23,6 @@ import {
     X,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { REDBOX_OFFICIAL_VIDEO_BASE_URL, getRedBoxOfficialVideoModel } from '../../shared/redboxVideo';
 import type { GenerationIntent, PendingChatMessage } from '../features/app-shell/types';
 import { subscribeSettingsUpdated } from '../bridge/appEvents';
 import type { UploadedFileAttachment } from '../components/ChatComposer';
@@ -2113,12 +2112,10 @@ export function GenerationStudio({
     const resolvedImageEndpoint = (settings.image_endpoint || settings.api_endpoint || '').trim();
     const resolvedImageApiKey = (settings.image_api_key || settings.api_key || '').trim();
     const hasImageConfig = Boolean(resolvedImageEndpoint) && Boolean(resolvedImageApiKey);
-    const resolvedVideoEndpoint = (settings.video_endpoint || REDBOX_OFFICIAL_VIDEO_BASE_URL).trim();
+    const resolvedVideoEndpoint = (settings.video_endpoint || '').trim();
     const resolvedVideoApiKey = (settings.video_api_key || settings.api_key || '').trim();
     const hasVideoConfig = Boolean(resolvedVideoEndpoint) && Boolean(resolvedVideoApiKey);
-    const effectiveVideoModel = resolvedVideoEndpoint === REDBOX_OFFICIAL_VIDEO_BASE_URL
-        ? getRedBoxOfficialVideoModel(videoMode)
-        : (settings.video_model || getRedBoxOfficialVideoModel(videoMode)).trim();
+    const effectiveVideoModel = (settings.video_model || '').trim();
     const resolvedVoiceEndpoint = (settings.voice_endpoint || settings.tts_endpoint || settings.api_endpoint || '').trim();
     const resolvedVoiceApiKey = (settings.voice_api_key || settings.tts_api_key || settings.api_key || '').trim();
     const hasVoiceConfig = Boolean(resolvedVoiceEndpoint) && Boolean(resolvedVoiceApiKey);

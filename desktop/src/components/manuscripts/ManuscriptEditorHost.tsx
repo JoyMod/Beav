@@ -29,7 +29,6 @@ import { usePageRefresh } from '../../hooks/usePageRefresh';
 import { composeMarkdownWithFrontmatter } from '../../utils/markdownFrontmatter';
 import { parseTimestampMs } from '../../utils/time';
 import { uiDebug, uiMeasure } from '../../utils/uiDebug';
-import { REDBOX_OFFICIAL_VIDEO_BASE_URL, getRedBoxOfficialVideoModel } from '../../../shared/redboxVideo';
 import { getLiquidGlassMenuItemClassName, LiquidGlassMenuPanel, LiquidGlassMenuSeparator } from '@/components/ui/liquid-glass-menu';
 import { buildEditorSessionBinding, type EditorAiWorkspaceMode } from '../../features/chat/editorSessionBinding';
 import { renameManuscriptKeepingExtension } from '../../../shared/manuscriptFiles';
@@ -1846,9 +1845,9 @@ export function ManuscriptEditorHost({ filePath, onNavigateToRedClaw, onNavigate
     const resolvedEndpoint = (settings.image_endpoint || settings.api_endpoint || '').trim();
     const resolvedApiKey = (settings.image_api_key || settings.api_key || '').trim();
     const hasImageConfig = Boolean(resolvedEndpoint) && Boolean(resolvedApiKey);
-    const resolvedVideoEndpoint = REDBOX_OFFICIAL_VIDEO_BASE_URL;
+    const resolvedVideoEndpoint = (settings.video_endpoint || '').trim();
     const resolvedVideoApiKey = (settings.video_api_key || settings.api_key || '').trim();
-    const effectiveVideoModel = getRedBoxOfficialVideoModel(videoGenerationMode);
+    const effectiveVideoModel = (settings.video_model || '').trim();
     const hasVideoConfig = Boolean(resolvedVideoEndpoint) && Boolean(resolvedVideoApiKey);
 
     const handleGenerateVideo = useCallback(async () => {
