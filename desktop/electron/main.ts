@@ -610,13 +610,13 @@ const appStartupEpochMs = Date.now();
 const startupPhaseMarks = new Map<string, number>();
 const DOWNLOAD_RETRY_DELAYS_MS = [0, 600, 1600];
 const XHS_ASSET_REQUEST_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 RedBox/1.0',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 ZhuYeMedia/1.0',
   'Referer': 'https://www.xiaohongshu.com/',
   'Origin': 'https://www.xiaohongshu.com',
   'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
 };
-const APP_UPDATE_RELEASES_PAGE_URL = 'https://github.com/Jamailar/RedBox/releases';
-const APP_UPDATE_LATEST_RELEASE_API_URL = 'https://api.github.com/repos/Jamailar/RedBox/releases/latest';
+const APP_UPDATE_RELEASES_PAGE_URL = 'https://github.com/JoyMod/Beav/releases';
+const APP_UPDATE_LATEST_RELEASE_API_URL = 'https://api.github.com/repos/JoyMod/Beav/releases/latest';
 const APP_UPDATE_CHECK_TIMEOUT_MS = 10000;
 const APP_UPDATE_CHECK_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000;
 let appUpdateCheckInFlight = false;
@@ -1205,7 +1205,7 @@ async function fetchLatestGithubRelease(): Promise<{
       method: 'GET',
       headers: {
         'Accept': 'application/vnd.github+json',
-        'User-Agent': `RedBox/${app.getVersion()}`,
+        'User-Agent': `ZhuYeMedia/${app.getVersion()}`,
       },
       signal: controller.signal,
     });
@@ -1344,8 +1344,8 @@ async function checkForAppUpdate(force = false, forceNotify = false): Promise<Ap
 
 function createWindow() {
   attachWorkItemStoreListeners();
-  const iconPath = path.join(app.getAppPath(), 'redbox.png');
-  const devIconPath = path.join(process.cwd(), 'archive', 'desktop-electron', 'redbox.png');
+  const iconPath = path.join(app.getAppPath(), 'dist', 'branding', 'logo.png');
+  const devIconPath = path.join(process.cwd(), 'public', 'branding', 'logo.png');
   const resolvedIconPath = app.isPackaged ? iconPath : devIconPath;
 
   win = new BrowserWindow({
@@ -4433,6 +4433,7 @@ ipcMain.handle('ai:detect-protocol', async (_, payload: {
 ipcMain.handle('ai:test-connection', async (_, payload: {
   apiKey?: string;
   baseURL?: string;
+  model?: string;
   presetId?: string;
   protocol?: 'openai' | 'anthropic' | 'gemini';
 }) => {
@@ -4441,6 +4442,7 @@ ipcMain.handle('ai:test-connection', async (_, payload: {
     const result = await testAiSourceConnection({
       apiKey: payload?.apiKey || '',
       baseURL: payload?.baseURL || '',
+      model: payload?.model || '',
       presetId: payload?.presetId,
       protocol: payload?.protocol,
     });
@@ -14593,36 +14595,52 @@ let httpServer: http.Server | null = null;
 
 const LOCAL_BROWSER_CHANNELS = new Set([
   'db:get-settings',
-  'db:save-settings',
   'spaces:list',
-  'spaces:create',
-  'spaces:rename',
-  'spaces:delete',
-  'spaces:switch',
   'media:list',
-  'media:import-files',
-  'media:update',
-  'media:delete',
-  'media:bind',
-  'media:open',
-  'media:open-root',
   'subjects:list',
   'subjects:get',
-  'subjects:create',
-  'subjects:update',
-  'subjects:delete',
   'subjects:search',
   'subjects:categories:list',
-  'subjects:categories:create',
-  'subjects:categories:update',
-  'subjects:categories:delete',
 ]);
+
+const LOCAL_BROWSER_ORIGINS = new Set([
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+]);
+
+const LOCAL_BROWSER_SECRET_KEY_PATTERN = /(api.?key|token|secret|password|authorization|credential)/i;
+
+function redactLocalBrowserSecrets(value: unknown, key = ''): unknown {
+  if (LOCAL_BROWSER_SECRET_KEY_PATTERN.test(key)) return '';
+  if (Array.isArray(value)) {
+    return value.map((item) => redactLocalBrowserSecrets(item));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([childKey, childValue]) => (
+      [childKey, redactLocalBrowserSecrets(childValue, childKey)]
+    )));
+  }
+  if (typeof value === 'string' && key.endsWith('_json')) {
+    try {
+      return JSON.stringify(redactLocalBrowserSecrets(JSON.parse(value)));
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
+function exposeSettingsToLocalBrowser(): Record<string, unknown> {
+  const settings = redactLocalBrowserSecrets(getSettings() || {}) as Record<string, unknown>;
+  settings.mcp_servers_json = '[]';
+  return settings;
+}
 
 function isTrustedLocalBrowserUrl(value: string | undefined): boolean {
   if (!value) return false;
   try {
     const url = new URL(value);
-    return url.protocol === 'http:' && ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+    return LOCAL_BROWSER_ORIGINS.has(url.origin);
   } catch {
     return false;
   }
@@ -14695,42 +14713,9 @@ async function invokeLocalBrowserDataChannel(channel: string, rawPayload: unknow
   try {
     switch (channel) {
       case 'db:get-settings':
-        return getSettings() || {};
-      case 'db:save-settings': {
-        const normalized = normalizeSettingsInput(payload) as Parameters<typeof saveSettings>[0];
-        const result = saveSettings(normalized);
-        setDebugLoggingEnabled(Boolean(normalized.debug_log_enabled));
-        await applyGlobalNetworkProxy((getSettings() || {}) as Record<string, unknown>);
-        broadcastSettingsUpdated();
-        return result;
-      }
+        return exposeSettingsToLocalBrowser();
       case 'spaces:list':
         return { spaces: listSpaces(), activeSpaceId: getActiveSpaceId() };
-      case 'spaces:create': {
-        const space = createSpace(String(rawPayload || ''));
-        await ensureWorkspaceStructureFor(getWorkspacePathsForSpace(space.id));
-        return { success: true, space };
-      }
-      case 'spaces:rename': {
-        const space = renameSpace(String(payload.id || ''), String(payload.name || ''));
-        return space ? { success: true, space } : { success: false, error: '空间不存在或名称无效' };
-      }
-      case 'spaces:delete': {
-        const spaceId = String(rawPayload || '');
-        const result = deleteSpace(spaceId);
-        await fs.rm(getWorkspacePathsForSpace(spaceId).base, { recursive: true, force: true });
-        if (result.deletedActiveSpace) {
-          await ensureWorkspaceStructureFor(getWorkspacePaths());
-          await refreshForSpaceChange();
-        }
-        return { success: true, ...result };
-      }
-      case 'spaces:switch': {
-        const space = setActiveSpace(String(rawPayload || ''));
-        await ensureWorkspaceStructureFor(getWorkspacePaths());
-        await refreshForSpaceChange();
-        return { success: true, space };
-      }
       case 'media:list': {
         const limit = Math.max(1, Math.min(500, Number(payload.limit || 300) || 300));
         const cursor = Math.max(0, Number(payload.cursor || 0) || 0);
@@ -14742,69 +14727,12 @@ async function invokeLocalBrowserDataChannel(channel: string, rawPayload: unknow
         const nextCursor = cursor + limit < assets.length ? String(cursor + limit) : null;
         return { success: true, assets: pageAssets, total: assets.length, nextCursor, hasMore: Boolean(nextCursor) };
       }
-      case 'media:import-files': {
-        const picker = await dialog.showOpenDialog({
-          title: '选择要导入到草稿媒体库的素材',
-          properties: ['openFile', 'multiSelections'],
-          filters: [
-            { name: 'Media Files', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg', 'mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv', 'mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'opus'] },
-            { name: 'All Files', extensions: ['*'] },
-          ],
-        });
-        if (picker.canceled || !picker.filePaths.length) return { success: true, canceled: true, imported: [] };
-        const imported = await importMediaFiles(picker.filePaths);
-        const enriched = await Promise.all(imported.map(async (asset) => ({
-          ...await enrichMediaAsset(asset),
-          previewUrl: localBrowserMediaUrl(asset.id),
-        })));
-        emitRendererDataChanged('media', { action: 'import' });
-        return { success: true, imported: enriched, added: enriched.length };
-      }
-      case 'media:update': {
-        if (!payload.assetId) return { success: false, error: 'assetId is required' };
-        const asset = await enrichMediaAsset(await updateMediaAssetMetadata({
-          assetId: String(payload.assetId),
-          projectId: payload.projectId,
-          title: payload.title,
-          prompt: payload.prompt,
-        }));
-        return { success: true, asset: { ...asset, previewUrl: localBrowserMediaUrl(String(payload.assetId)) } };
-      }
-      case 'media:delete':
-        return { success: true, deleted: await deleteMediaAsset(String(payload.assetId || '')) };
-      case 'media:bind': {
-        const manuscriptPath = normalizeRelativePath(String(payload.manuscriptPath || ''));
-        await fs.access(path.join(getWorkspacePaths().manuscripts, manuscriptPath));
-        const asset = await bindMediaAssetToManuscript({
-          assetId: String(payload.assetId || ''),
-          manuscriptPath,
-          role: payload.role,
-        });
-        return { success: true, asset: await enrichMediaAsset(asset) };
-      }
-      case 'media:open': {
-        const asset = (await listMediaAssets(5000)).find((item) => item.id === String(payload.assetId || ''));
-        if (!asset) return { success: false, error: 'Media asset not found' };
-        const openError = await shell.openPath(asset.relativePath ? getAbsoluteMediaPath(asset.relativePath) : getWorkspacePaths().media);
-        return openError ? { success: false, error: openError } : { success: true };
-      }
-      case 'media:open-root': {
-        const openError = await shell.openPath(getWorkspacePaths().media);
-        return openError ? { success: false, error: openError } : { success: true };
-      }
       case 'subjects:list': {
         const subjects = await listSubjects(Number(payload.limit || 500));
         return { success: true, subjects: subjects.map(exposeSubjectToLocalBrowser) };
       }
       case 'subjects:get':
         return { success: true, subject: exposeSubjectToLocalBrowser(await getSubject(String(payload.id || ''))) };
-      case 'subjects:create':
-        return { success: true, subject: exposeSubjectToLocalBrowser(await createSubject(payload as any)) };
-      case 'subjects:update':
-        return { success: true, subject: exposeSubjectToLocalBrowser(await updateSubject(payload as any)) };
-      case 'subjects:delete':
-        await deleteSubject(String(payload.id || ''));
-        return { success: true };
       case 'subjects:search': {
         const subjects = await searchSubjects(String(payload.query || ''), {
           categoryId: payload.categoryId,
@@ -14814,13 +14742,6 @@ async function invokeLocalBrowserDataChannel(channel: string, rawPayload: unknow
       }
       case 'subjects:categories:list':
         return { success: true, categories: await listSubjectCategories() };
-      case 'subjects:categories:create':
-        return { success: true, category: await createSubjectCategory(String(payload.name || '')) };
-      case 'subjects:categories:update':
-        return { success: true, category: await updateSubjectCategory({ id: String(payload.id || ''), name: String(payload.name || '') }) };
-      case 'subjects:categories:delete':
-        await deleteSubjectCategory(String(payload.id || ''));
-        return { success: true };
     }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -15239,18 +15160,26 @@ function startHttpServer() {
   const fs = require('fs/promises');
 
   httpServer = http.createServer(async (req, res) => {
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${HTTP_PORT}`);
+    const trustedLocalBrowserRequest = isTrustedLocalBrowserRequest(req);
+    const requestOrigin = String(req.headers.origin || '');
+    if (trustedLocalBrowserRequest && requestOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', new URL(requestOrigin).origin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Vary', 'Origin');
+    }
 
     if (req.method === 'OPTIONS') {
+      if (requestUrl.pathname.startsWith('/api/local/') && !trustedLocalBrowserRequest) {
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
+      }
       res.writeHead(204);
       res.end();
       return;
     }
-
-    const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${HTTP_PORT}`);
 
     if (req.method === 'POST' && requestUrl.pathname === '/api/local/invoke') {
       if (!isTrustedLocalBrowserRequest(req)) {
@@ -15756,7 +15685,7 @@ function startHttpServer() {
       });
     } else if (req.method === 'GET' && req.url === '/api/status') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', app: 'RedConvert' }));
+      res.end(JSON.stringify({ status: 'ok', app: '竹叶自媒体平台' }));
     } else if (req.method === 'POST' && req.url === '/api/youtube-notes') {
       let body = '';
       req.on('data', chunk => { body += chunk; });

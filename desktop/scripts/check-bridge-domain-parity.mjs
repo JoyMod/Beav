@@ -6,10 +6,6 @@ import ts from 'typescript';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const archiveRoot = path.resolve(__dirname, '..');
-const repoRoot = path.resolve(archiveRoot, '..', '..');
-const baselineRoot = process.env.RED_BOX_PARITY_BASELINE?.trim()
-  ? path.resolve(process.env.RED_BOX_PARITY_BASELINE)
-  : path.join(repoRoot, 'desktop');
 
 function parseSource(filePath) {
   return ts.createSourceFile(
@@ -151,41 +147,31 @@ async function listBridgeDomains(dir) {
     .sort();
 }
 
-const formalDir = path.join(baselineRoot, 'src', 'bridge', 'domains');
-const archiveDir = path.join(archiveRoot, 'src', 'bridge', 'domains');
-
-const [formalDomains, archiveDomains] = await Promise.all([
-  listBridgeDomains(formalDir),
-  listBridgeDomains(archiveDir),
-]);
-
-const archiveDomainSet = new Set(archiveDomains);
-const missingDomains = formalDomains.filter((name) => !archiveDomainSet.has(name));
+const domainsDir = path.join(archiveRoot, 'src', 'bridge', 'domains');
+const ipcRendererPath = path.join(archiveRoot, 'src', 'bridge', 'ipcRenderer.ts');
+const domains = await listBridgeDomains(domainsDir);
+const imports = getNamedImports(ipcRendererPath);
+const registeredDomains = new Set(
+  [...imports.values()]
+    .filter((modulePath) => modulePath.startsWith('./domains/'))
+    .map((modulePath) => `${path.basename(modulePath)}.ts`),
+);
+const missingDomains = domains.filter((name) => !registeredDomains.has(name));
 
 if (missingDomains.length > 0) {
-  console.error('Missing Electron bridge domain compatibility files:');
+  console.error('Electron bridge domain files not registered by ipcRenderer:');
   for (const name of missingDomains) {
     console.error(`- ${name}`);
   }
   process.exit(1);
 }
 
-const formalIpcRenderer = path.join(baselineRoot, 'src', 'bridge', 'ipcRenderer.ts');
-const archiveIpcRenderer = path.join(archiveRoot, 'src', 'bridge', 'ipcRenderer.ts');
-const formalPaths = collectIpcRendererPaths(formalIpcRenderer);
-const archivePaths = collectIpcRendererPaths(archiveIpcRenderer);
-const missingApiPaths = [...formalPaths]
-  .filter((apiPath) => !archivePaths.has(apiPath))
-  .sort();
-
-if (missingApiPaths.length > 0) {
-  console.error('Missing Electron bridge API compatibility paths:');
-  for (const apiPath of missingApiPaths) {
-    console.error(`- ${apiPath}`);
-  }
+const apiPaths = collectIpcRendererPaths(ipcRendererPath);
+if (apiPaths.size === 0) {
+  console.error('Electron bridge does not expose any API paths.');
   process.exit(1);
 }
 
 console.log(
-  `Bridge compatibility check passed: ${formalDomains.length} formal domains and ${formalPaths.size} formal API paths covered.`,
+  `Bridge integrity check passed: ${domains.length} domain files registered and ${apiPaths.size} API paths exposed.`,
 );

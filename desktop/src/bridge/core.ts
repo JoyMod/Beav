@@ -41,7 +41,7 @@ const LOCAL_BROWSER_INVOKE_URL = 'http://127.0.0.1:23456/api/local/invoke';
 
 function isLocalBrowserRuntime(): boolean {
   if (typeof window === 'undefined') return false;
-  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+  return ['http://localhost:5173', 'http://127.0.0.1:5173'].includes(window.location.origin);
 }
 
 export async function invokeLocalBrowserChannel(channel: string, payload?: unknown): Promise<any> {

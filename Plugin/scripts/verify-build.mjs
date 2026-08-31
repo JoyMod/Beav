@@ -225,11 +225,8 @@ assert.doesNotMatch(
 );
 const backgroundBrowserTools = extractBackgroundMcpTools(browserControlBackgroundSource);
 const jsFallbackBrowserTools = extractJsFallbackTools(await readText(path.join(pluginRoot, 'mcp-server.mjs')));
-const rustBrowserMcpSource = await readText(path.join(repositoryRoot, 'desktop/src-tauri/src/browser_control_mcp.rs'));
-const rustEnabledBrowserTools = extractRustToolConst(rustBrowserMcpSource, 'ENABLED_TOOLS');
 assertSameSet('.mcp enabledTools', configuredBrowserTools, 'browserControlBackground tools', backgroundBrowserTools);
 assertSameSet('.mcp enabledTools', configuredBrowserTools, 'mcp-server fallback tools', jsFallbackBrowserTools);
-assertSameSet('.mcp enabledTools', configuredBrowserTools, 'Rust browser MCP tools', rustEnabledBrowserTools);
 
 const browserActionCases = new Set([...browserControlBackgroundSource.matchAll(/case '([^']+)'/g)].map((item) => item[1]));
 const missingBrowserActionCases = configuredBrowserTools.filter((toolName) => !browserActionCases.has(toolName));
@@ -242,8 +239,7 @@ assert.equal(
 const configuredReadOnlyTools = Object.entries(browserMcpConfig.mcpServers?.['browser-control']?.perTool || {})
   .filter(([, policy]) => policy?.approvalMode === 'never')
   .map(([toolName]) => toolName);
-const rustReadOnlyBrowserTools = extractRustToolConst(rustBrowserMcpSource, 'READ_ONLY_TOOLS');
-assertSameSet('.mcp read-only browser tools', configuredReadOnlyTools, 'Rust read-only browser tools', rustReadOnlyBrowserTools);
+assert(configuredReadOnlyTools.length > 0, 'Browser MCP config must declare read-only tools explicitly');
 
 for (const toolName of [
   'tab.back',

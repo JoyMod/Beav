@@ -2,7 +2,7 @@ const DEFAULT_SETTINGS = {
   actionLaunchMode: 'popup',
   xhsSaveCommentsWithNote: true,
   saveToRedboxByDefault: true,
-  autoUpdateCheck: true,
+  autoUpdateCheck: false,
 };
 
 const elements = {

@@ -6,12 +6,12 @@
   "aiDisplayName": "竹叶自媒体平台",
   "logoSrc": "/branding/logo.png",
   "tagline": "本地化自媒体 AI 工作台",
-  "downloadUrl": "",
-  "githubIssuesUrl": "",
-  "githubRepoUrl": "",
-  "founderXHandle": "@JambaHailar",
-  "founderXUrl": "https://x.com/JambaHailar",
-  "developerWechatQrSrc": "/branding/developer-wechat-qr.jpg",
+  "downloadUrl": "https://github.com/JoyMod/Beav/releases",
+  "githubIssuesUrl": "https://github.com/JoyMod/Beav/issues",
+  "githubRepoUrl": "https://github.com/JoyMod/Beav",
+  "founderXHandle": "",
+  "founderXUrl": "",
+  "developerWechatQrSrc": "",
   "visibleSettingsTabs": [
     "ai",
     "general"

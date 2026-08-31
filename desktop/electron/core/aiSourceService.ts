@@ -10,6 +10,7 @@ export type AiProtocol = 'openai' | 'anthropic' | 'gemini';
 export interface AiSourceConnectionInput {
   apiKey: string;
   baseURL: string;
+  model?: string;
   presetId?: string;
   protocol?: AiProtocol;
   purpose?: 'chat' | 'image';
@@ -24,6 +25,7 @@ export interface AiConnectionTestResult {
   success: boolean;
   protocol: AiProtocol;
   models: AiModelInfo[];
+  verifiedModel?: string;
   message: string;
 }
 
@@ -375,11 +377,59 @@ export async function fetchModelsForAiSource(input: AiSourceConnectionInput): Pr
 }
 
 export async function testAiSourceConnection(input: AiSourceConnectionInput): Promise<AiConnectionTestResult> {
-  const { protocol, models } = await fetchModelsForAiSource(input);
+  const protocol = detectAiProtocol(input);
+  if (protocol !== 'openai') {
+    const { models } = await fetchModelsForAiSource(input);
+    return {
+      success: true,
+      protocol,
+      models,
+      message: `模型列表连接成功（${protocol}）；个人版创作首发优先支持 OpenAI Compatible 协议`,
+    };
+  }
+
+  const baseURL = normalizeApiBaseUrl(input.baseURL);
+  const apiKey = String(input.apiKey || '').trim();
+  if (!baseURL) throw new Error('请填写 API Endpoint');
+  if (!apiKey && !allowEmptyApiKeyForOpenAiCompatible(input)) throw new Error('请填写 API Key');
+
+  let models: AiModelInfo[] = [];
+  let model = String(input.model || '').trim();
+  if (!model) {
+    const fetched = await fetchModelsForAiSource(input);
+    models = fetched.models;
+    model = models[0]?.id || '';
+  }
+  if (!model) throw new Error('请先添加并选择一个聊天模型或方舟 Endpoint ID');
+
+  const response = await withTimeout(fetch(safeUrlJoin(baseURL, '/chat/completions'), {
+    method: 'POST',
+    headers: {
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: '请只回复 OK' }],
+      max_tokens: 8,
+      temperature: 0,
+    }),
+  }));
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`真实对话失败（HTTP ${response.status}）：${text || response.statusText}`);
+  }
+  const payload = await response.json() as { choices?: Array<{ message?: { content?: unknown } }> };
+  const reply = String(payload?.choices?.[0]?.message?.content || '').trim();
+  if (!reply) throw new Error('接口返回成功，但没有收到模型回复');
+  if (!models.some((item) => item.id === model)) {
+    models = [{ id: model, capabilities: inferModelCapabilities(model) }, ...models];
+  }
   return {
     success: true,
     protocol,
     models,
-    message: `连接成功（${protocol}），可用模型 ${models.length} 个`,
+    verifiedModel: model,
+    message: `真实对话验证通过：${model}`,
   };
 }

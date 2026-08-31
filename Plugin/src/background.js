@@ -19,8 +19,8 @@ const INLINE_ASSET_MAX_BYTES = 6 * 1024 * 1024;
 const UPDATE_STATE_KEY = 'pluginUpdateState';
 const UPDATE_ALARM_NAME = 'redbox-plugin-auto-update-check';
 const UPDATE_CHECK_INTERVAL_MINUTES = 360;
-const UPDATE_SOURCE_API_URL = 'https://redbox.ziz.hk/api/updates/plugin';
-const UPDATE_SOURCE_DOWNLOAD_URL = 'https://redbox.ziz.hk/download';
+const UPDATE_SOURCE_API_URL = 'https://api.github.com/repos/JoyMod/Beav/releases/latest';
+const UPDATE_SOURCE_DOWNLOAD_URL = 'https://github.com/JoyMod/Beav/releases';
 const REDBOX_PLUGIN_SETTINGS_KEY = 'redboxPluginSettings';
 const XHS_TASK_HISTORY_KEY = 'xhsCollectorTaskHistory';
 const XHS_TASK_QUEUE_STATE_KEY = 'xhsCollectorTaskQueueState';
@@ -98,7 +98,7 @@ const DEFAULT_PLUGIN_SETTINGS = {
   xhsBloggerCollectionMode: 'api',
   xhsSaveCommentsWithNote: true,
   saveToRedboxByDefault: true,
-  autoUpdateCheck: true,
+  autoUpdateCheck: false,
 };
 
 const USER_PROFILE_FEATURE_ENABLED = true;
@@ -2463,10 +2463,10 @@ async function checkForPluginUpdates(options = {}) {
     });
     const remoteManifest = await fetchRemotePluginManifest();
     const currentVersion = getCurrentPluginVersion();
-    const latestVersion = normalizeText(remoteManifest?.version || remoteManifest?.tag) || currentVersion;
+    const latestVersion = normalizeText(remoteManifest?.version || remoteManifest?.tag || remoteManifest?.tag_name).replace(/^v/i, '') || currentVersion;
     const hasUpdate = remoteManifest?.ready !== false
       && (remoteManifest?.updateAvailable === true || compareVersions(latestVersion, currentVersion) > 0);
-    const sourceUrl = normalizeText(remoteManifest?.plugin?.url || remoteManifest?.releaseUrl) || UPDATE_SOURCE_DOWNLOAD_URL;
+    const sourceUrl = normalizeText(remoteManifest?.plugin?.url || remoteManifest?.releaseUrl || remoteManifest?.html_url) || UPDATE_SOURCE_DOWNLOAD_URL;
     const nextState = await writePluginUpdateState({
       ...checkingState,
       currentVersion,

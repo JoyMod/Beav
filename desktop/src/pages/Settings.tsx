@@ -998,6 +998,7 @@ export function Settings({
   const [voiceSourceId, setVoiceSourceId] = useState('');
   const [testStatus, setTestStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [testMsg, setTestMsg] = useState('');
+  const [testingAiSourceId, setTestingAiSourceId] = useState('');
   const [recentDebugLogs, setRecentDebugLogs] = useState<string[]>([]);
   const [isDebugLogsLoading, setIsDebugLogsLoading] = useState(false);
   const [fileIndexDashboard, setFileIndexDashboard] = useState<FileIndexDashboard | null>(
@@ -2261,6 +2262,44 @@ export function Settings({
       ...prev,
       [sourceId]: !(prev[sourceId] ?? false),
     }));
+  };
+
+  const handleTestAiSourceConnection = async (source: AiSourceConfig) => {
+    setActiveAiSourceId(source.id);
+    setDetectedAiProtocol((source.protocol || 'openai') as AiProtocol);
+    setTestingAiSourceId(source.id);
+    setTestStatus('idle');
+    setTestMsg('正在发起最小真实对话…');
+    try {
+      const result = await window.ipcRenderer.aiConfig.testAiConnection({
+        apiKey: source.apiKey,
+        baseURL: source.baseURL,
+        model: source.model || source.models?.[0] || '',
+        presetId: source.presetId,
+        protocol: source.protocol || 'openai',
+      });
+      setDetectedAiProtocol(result.protocol);
+      if (!result.success) throw new Error(result.message || '连接失败');
+      if (result.models?.length) {
+        const returnedModels = result.models.map((item) => item.id).filter(Boolean);
+        updateAiSource(source.id, (current) => ({
+          ...current,
+          model: result.verifiedModel || current.model || returnedModels[0] || '',
+          models: normalizeSourceModels([...(current.models || []), ...returnedModels]),
+          modelsMeta: normalizeAiModelDescriptors([
+            ...(current.modelsMeta || []),
+            ...result.models,
+          ]),
+        }));
+      }
+      setTestStatus('success');
+      setTestMsg(result.message);
+    } catch (error) {
+      setTestStatus('error');
+      setTestMsg(error instanceof Error ? error.message : String(error));
+    } finally {
+      setTestingAiSourceId('');
+    }
   };
 
   const ensureDisplayedAiSourcePersisted = (sourceId: string) => {
@@ -6884,6 +6923,16 @@ export function Settings({
                                         已添加模型
                                       </button>
                                       <div className="flex items-center gap-2">
+                                        {!isOfficialSource && (
+                                          <button
+                                            type="button"
+                                            onClick={() => void handleTestAiSourceConnection(source)}
+                                            disabled={testingAiSourceId === source.id}
+                                            className="px-2 py-1 text-[11px] border border-border rounded hover:bg-surface-secondary disabled:opacity-60 transition-colors"
+                                          >
+                                            {testingAiSourceId === source.id ? '验证中…' : '测试真实对话'}
+                                          </button>
+                                        )}
                                         <button
                                           type="button"
                                           onClick={() => openAddModelModal(source)}

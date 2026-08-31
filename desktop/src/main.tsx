@@ -101,8 +101,14 @@ const appTree = (
 );
 
 const isDevRuntime = window.location.protocol !== 'file:';
+const rootElement = document.getElementById('root')!;
+const appWindow = window as typeof window & {
+  __ZHUYE_REACT_ROOT__?: ReturnType<typeof ReactDOM.createRoot>;
+};
+const appRoot = appWindow.__ZHUYE_REACT_ROOT__ || ReactDOM.createRoot(rootElement);
+appWindow.__ZHUYE_REACT_ROOT__ = appRoot;
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+appRoot.render(
   isDevRuntime
     ? appTree
     : appTree,

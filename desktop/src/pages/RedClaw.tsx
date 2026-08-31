@@ -2120,12 +2120,12 @@ export function RedClaw({
         actions.push(
             {
                 label: '想吐槽或提建议?',
-                url: APP_BRAND.githubIssuesUrl || 'https://github.com/Jamailar/RedBox/issues',
+                url: APP_BRAND.githubIssuesUrl || 'https://github.com/JoyMod/Beav/issues',
                 icon: <MessageSquarePlus className="w-5 h-5" />,
             },
             {
                 label: '喜欢我就点个 Star 吧',
-                url: APP_BRAND.githubRepoUrl || 'https://github.com/Jamailar/RedBox',
+                url: APP_BRAND.githubRepoUrl || 'https://github.com/JoyMod/Beav',
                 icon: <Heart className="w-5 h-5 fill-current" />,
                 color: 'text-rose-500'
             }

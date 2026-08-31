@@ -18,7 +18,7 @@ const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'beav-desktop-bridge-cl
 const descriptorPath = path.join(tempRoot, 'desktop-bridge-v1.json');
 const endpointPath = process.platform === 'win32'
   ? `\\\\.\\pipe\\beav-desktop-bridge-client-${process.pid}-${randomUUID()}`
-  : path.join(tempRoot, 'desktop-bridge-v1.sock');
+  : path.join(os.tmpdir(), `beav-bridge-${process.pid}-${randomUUID().slice(0, 8)}.sock`);
 const controlAuthToken = 'c'.repeat(64);
 const requests = [];
 const server = net.createServer((socket) => {
@@ -103,6 +103,7 @@ try {
 } finally {
   delete process.env.REDBOX_BROWSER_BRIDGE_DESCRIPTOR;
   await close(server);
+  if (process.platform !== 'win32') await fs.rm(endpointPath, { force: true });
   await fs.rm(tempRoot, { recursive: true, force: true });
 }
 

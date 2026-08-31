@@ -1851,7 +1851,7 @@ declare global {
         list: () => Promise<RoleSpec[]>;
       };
       detectAiProtocol: (config: { baseURL: string; presetId?: string; protocol?: string }) => Promise<{ success: boolean; protocol: 'openai' | 'anthropic' | 'gemini'; error?: string }>;
-      testAiConnection: (config: { apiKey: string; baseURL: string; presetId?: string; protocol?: 'openai' | 'anthropic' | 'gemini' }) => Promise<{ success: boolean; protocol: 'openai' | 'anthropic' | 'gemini'; models: Array<{ id: string }>; message: string }>;
+      testAiConnection: (config: { apiKey: string; baseURL: string; model?: string; presetId?: string; protocol?: 'openai' | 'anthropic' | 'gemini' }) => Promise<{ success: boolean; protocol: 'openai' | 'anthropic' | 'gemini'; models: Array<{ id: string }>; verifiedModel?: string; message: string }>;
       startChat: (message: string, modelConfig?: unknown) => void;
       cancelChat: () => void;
       confirmTool: (callId: string, confirmed: boolean) => void;

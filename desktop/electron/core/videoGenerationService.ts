@@ -48,8 +48,8 @@ const VIDEO_TASK_POLL_INTERVAL_MS = 3000;
 const VIDEO_TASK_POLL_TIMEOUT_MS = 6 * 60 * 1000;
 
 function isRedBoxCompatibleEndpoint(endpoint: string): boolean {
-    const normalized = normalizeApiBaseUrl(endpoint).toLowerCase();
-    return normalized.includes('api.ziz.hk') && normalized.includes('/v1');
+    void endpoint;
+    return false;
 }
 
 function normalizeVideoAspectRatio(value: string): '16:9' | '9:16' {
@@ -577,13 +577,13 @@ export async function generateVideosToMediaLibrary(input: GenerateVideosInput): 
     const model = getRedBoxOfficialVideoModel(generationMode || 'text-to-video');
 
     if (!endpoint) {
-        throw new Error('生视频 Endpoint 未配置。请先登录或配置竹叶自媒体平台官方 AI 源。');
+        throw new Error('个人本地版暂未接通生视频供应商；当前请先使用文本对话能力。');
     }
     if (!apiKey) {
         throw new Error('生视频 API Key 未配置。请先登录或配置竹叶自媒体平台官方 AI 源。');
     }
     if (!isRedBoxCompatibleEndpoint(endpoint)) {
-        throw new Error('生视频能力已锁定为竹叶自媒体平台官方视频源。请先使用竹叶自媒体平台官方 AI 源。');
+        throw new Error('个人本地版暂未接通生视频供应商；当前请先使用文本对话能力。');
     }
     console.log('[VideoGeneration] auth prepared', {
         endpoint,

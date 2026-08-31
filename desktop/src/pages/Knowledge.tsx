@@ -67,7 +67,7 @@ interface SettingsShape {
     visual_index_enabled?: boolean;
 }
 
-const BROWSER_PLUGIN_DOWNLOAD_URL = APP_BRAND.downloadUrl || 'https://redbox.ziz.hk/download';
+const BROWSER_PLUGIN_DOWNLOAD_URL = APP_BRAND.downloadUrl || 'https://github.com/JoyMod/Beav/releases';
 
 function ObsidianIcon({ className }: { className?: string }) {
     return (

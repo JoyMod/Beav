@@ -1,12 +1,12 @@
 {
-  "name": "red-convert-desktop",
+  "name": "zhuye-media-desktop",
   "version": "2.5.0",
   "engines": {
     "node": ">=22 <23"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Jamailar/RedBox.git"
+    "url": "https://github.com/JoyMod/Beav.git"
   },
   "main": "dist-electron/main.js",
   "scripts": {
@@ -19,7 +19,9 @@
     "check:bridge-domains": "node scripts/check-bridge-domain-parity.mjs",
     "check:ui-parity": "node scripts/check-ui-parity-source.mjs",
     "check:types": "tsc --noEmit --pretty false",
-    "check:parity": "node scripts/check-ui-parity-source.mjs && node scripts/check-bridge-domain-parity.mjs && tsc --noEmit --pretty false",
+    "check:personal-boundaries": "node scripts/check-personal-local-boundaries.mjs",
+    "test:ai-source-connection": "node scripts/test-ai-source-connection.mjs",
+    "check:parity": "node scripts/check-ui-parity-source.mjs && node scripts/check-bridge-domain-parity.mjs && node scripts/check-personal-local-boundaries.mjs && node scripts/test-ai-source-connection.mjs && tsc --noEmit --pretty false",
     "build": "pnpm run prepare:private-runtime && pnpm run prepare:plugin-runtime && pnpm run prepare:ffmpeg && pnpm run clean && tsc && vite build && pnpm run sync:prompt-library && electron-builder",
     "build:mac": "pnpm run prepare:private-runtime && pnpm run prepare:plugin-runtime && pnpm run prepare:ffmpeg && pnpm run clean && tsc && vite build && pnpm run sync:prompt-library && electron-builder --mac --x64 --arm64",
     "build:mac:signed": "pnpm run prepare:private-runtime && pnpm run prepare:plugin-runtime && pnpm run prepare:ffmpeg && pnpm run clean && tsc && vite build && pnpm run sync:prompt-library && electron-builder --mac --x64 --arm64 -c.mac.notarize=false",
@@ -33,7 +35,7 @@
   "build": {
     "productName": "竹叶自媒体平台",
     "artifactName": "竹叶自媒体平台-${version}-${arch}.${ext}",
-    "appId": "com.redbox.app",
+    "appId": "com.joymod.zhuyemedia",
     "directories": {
       "output": "release"
     },
@@ -46,7 +48,6 @@
       ".plugin-runtime/**",
       "scripts/**",
       "package.json",
-      "redbox.png",
       "node_modules/protobufjs/**",
       "node_modules/@protobufjs/**",
       "node_modules/long/**",
@@ -68,23 +69,19 @@
       "!node_modules/langsmith/**",
       "!node_modules/@opentelemetry/**"
     ],
-    "icon": "redbox.png",
+    "icon": "public/branding/logo.png",
     "mac": {
       "target": [
         "dmg",
         "zip"
       ],
-      "icon": "redbox.png",
-      "identity": "Hunan Xizi Culture Co., Ltd. (N9KF8X5S99)",
+      "icon": "public/branding/logo.png",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "extendInfo": {
         "CFBundleDisplayName": "竹叶自媒体平台",
         "CFBundleName": "竹叶自媒体平台",
         "NSCameraUsageDescription": "This app requires camera access to record videos."
-      },
-      "notarize": {
-        "teamId": "N9KF8X5S99"
       }
     },
     "asarUnpack": [
@@ -103,15 +100,15 @@
           ]
         }
       ],
-      "icon": "redbox.png"
+      "icon": "public/branding/logo.png"
     },
     "linux": {
-      "icon": "redbox.png"
+      "icon": "public/branding/logo.png"
     },
     "publish": {
       "provider": "github",
-      "owner": "Jamailar",
-      "repo": "RedBox",
+      "owner": "JoyMod",
+      "repo": "Beav",
       "releaseType": "release"
     }
   },

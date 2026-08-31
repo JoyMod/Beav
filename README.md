@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./images/beav-icon.png" alt="竹叶自媒体平台" width="88">
+  <img src="./desktop/public/branding/logo.png" alt="竹叶自媒体平台" width="88">
 </p>
 
 <h1 align="center">竹叶自媒体平台</h1>
@@ -11,16 +11,16 @@
 <p align="center">本地优先 · 素材可复用 · 支持自选模型 · macOS / Windows / Linux</p>
 
 <p align="center">
-  <a href="https://github.com/Jamailar/Beav/releases/latest"><img src="https://img.shields.io/github/v/release/Jamailar/Beav?style=flat-square&color=C56F2C" alt="Latest Release"></a>
-  <a href="https://github.com/Jamailar/Beav"><img src="https://img.shields.io/github/stars/Jamailar/Beav?style=flat-square&color=C56F2C" alt="GitHub Stars"></a>
-  <a href="https://github.com/Jamailar/Beav/releases"><img src="https://img.shields.io/github/downloads/Jamailar/Beav/total?style=flat-square&color=C56F2C" alt="Total Downloads"></a>
-  <a href="https://github.com/Jamailar/Beav/releases/latest"><img src="https://img.shields.io/github/release-date/Jamailar/Beav?style=flat-square&color=6C757D" alt="Release Date"></a>
+  <a href="https://github.com/JoyMod/Beav/releases/latest"><img src="https://img.shields.io/github/v/release/JoyMod/Beav?style=flat-square&color=C56F2C" alt="Latest Release"></a>
+  <a href="https://github.com/JoyMod/Beav"><img src="https://img.shields.io/github/stars/JoyMod/Beav?style=flat-square&color=C56F2C" alt="GitHub Stars"></a>
+  <a href="https://github.com/JoyMod/Beav/releases"><img src="https://img.shields.io/github/downloads/JoyMod/Beav/total?style=flat-square&color=C56F2C" alt="Total Downloads"></a>
+  <a href="https://github.com/JoyMod/Beav/releases/latest"><img src="https://img.shields.io/github/release-date/JoyMod/Beav?style=flat-square&color=6C757D" alt="Release Date"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT--NC-6C757D?style=flat-square" alt="License"></a>
-  <a href="https://redbox.ziz.hk/download"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-6C757D?style=flat-square" alt="Platform"></a>
+  <a href="https://github.com/JoyMod/Beav/releases"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-6C757D?style=flat-square" alt="Platform"></a>
 </p>
 
 <p align="center">
-  <a href="https://redbox.ziz.hk"><strong><big>下载 竹叶自媒体平台</big></strong></a>
+  <a href="https://github.com/JoyMod/Beav/releases"><strong><big>下载 竹叶自媒体平台</big></strong></a>
 </p>
 
 <p align="center">
@@ -88,7 +88,7 @@
 
 ## 功能矩阵
 
-以下能力均已实现。
+以下是项目的整体能力矩阵。当前个人本地版的首轮验收范围是本地资产、知识库、文本对话与创作；生视频、数字人等媒体供应商尚未接通，不应视为当前可用能力。
 
 | 采集与数据 | 洞察与选题 | 内容创作 | 视觉与媒体 | 排期与自动化 |
 | --- | --- | --- | --- | --- |
@@ -131,17 +131,17 @@ IPWO 提供全球住宅IP资源，支持多地区 IP 环境访问，为自动化
 
 ## 快速开始
 
-1. 前往 [下载页](https://redbox.ziz.hk/download) 安装 竹叶自媒体平台。
+1. 从 [JoyMod/Beav Releases](https://github.com/JoyMod/Beav/releases) 获取安装包，或按仓库说明在本机启动。
 2. 为一个账号或品牌创建一个工作空间。
-3. 在 `设置 → AI` 使用官方 AI，或配置自己的 Endpoint、API Key 和模型。
-4. 如需网页采集，从 [最新 Release](https://github.com/Jamailar/Beav/releases/latest) 获取 Chrome / Edge 扩展。
+3. 在 `设置 → AI` 配置自己的 Endpoint、API Key 和模型，并点击“测试真实对话”。
+4. 如需网页采集，从 [最新 Release](https://github.com/JoyMod/Beav/releases/latest) 获取 Chrome / Edge 扩展。
 
 ## 信任与边界
 
 - **本地优先**：素材、稿件和项目以本地工作空间为核心组织。
-- **模型可选**：支持官方 AI 和 OpenAI-compatible 模型服务。
+- **模型可选**：个人版优先支持 OpenAI-compatible 模型服务，包括豆包 / 火山方舟和 Grok / xAI。
 - **发布透明**：安装包、扩展、更新资产和签名均通过 GitHub Releases 发布。
-- **边界公开**：许可证、[更新日志](./CHANGELOG.md)、[路线图](./ROADMAP.md) 和 [Issues](https://github.com/Jamailar/Beav/issues) 均可查。
+- **边界公开**：许可证、[更新日志](./CHANGELOG.md)、[路线图](./ROADMAP.md) 和 [Issues](https://github.com/JoyMod/Beav/issues) 均可查。
 
 ## Agent 插件
 
@@ -152,25 +152,24 @@ IPWO 提供全球住宅IP资源，支持多地区 IP 环境访问，为自动化
 **Codex**
 
 ```text
-/goal Read https://beav.ziz.hk/agent to install the 竹叶自媒体平台 Creator plugin and set up a new task for me.
+/goal 在本机安装当前仓库的 竹叶自媒体平台 Creator 插件，并为我创建一个新任务。
 ```
 
 **WorkBuddy**
 
 ```text
-Read https://beav.ziz.hk/workbuddy to install the 竹叶自媒体平台 Creator plugin and connect it to my local 竹叶自媒体平台 workspace.
+安装当前仓库的 竹叶自媒体平台 Creator 插件，并连接到我的本地工作空间。
 ```
 
 安装完成后，直接在 Codex 或 WorkBuddy 中描述任务即可；浏览器 UI 只供用户操作，不作为 Agent 控制通道。
 
 ## 社区
 
-- [官网与下载](https://beav.me/)
-- [GitHub Releases](https://github.com/Jamailar/Beav/releases)
-- [问题反馈](https://github.com/Jamailar/Beav/issues)
+- [GitHub Releases](https://github.com/JoyMod/Beav/releases)
+- [问题反馈](https://github.com/JoyMod/Beav/issues)
 - [Bilibili 视频教程](https://www.bilibili.com/video/BV12LNn6nEem/)
 
-竹叶自媒体平台 由 [JambaHailar](https://x.com/JambaHailar) 独立开发和维护。
+竹叶自媒体平台是基于 Beav 的个人本地化二次开发版本；原项目许可和署名信息继续保留在仓库中。
 
 ## 开源版本说明
 
