@@ -10930,7 +10930,8 @@ const listKnowledgeCatalogNotes = async () => {
       const meta = JSON.parse(metaContent) as Record<string, any>;
       let cover = String(meta.cover || '').trim();
       if (cover && !cover.startsWith('http')) {
-        cover = toLocalFileUrl(path.join(noteDir, cover));
+        const assetPath = cover.split(/[\\/]+/).filter(Boolean).map(encodeURIComponent).join('/');
+        cover = `http://127.0.0.1:23456/api/local/knowledge/${encodeURIComponent(dir.name)}/asset/${assetPath}`;
       }
       const tags = Array.isArray(meta.tags) ? meta.tags.map((value: unknown) => String(value || '').trim()).filter(Boolean) : [];
       notes.push({
@@ -15247,7 +15248,8 @@ function startHttpServer() {
 
     const localMediaMatch = requestUrl.pathname.match(/^\/api\/local\/media\/([^/]+)$/);
     const localSubjectMediaMatch = requestUrl.pathname.match(/^\/api\/local\/subjects\/([^/]+)\/(image|voice|video)\/(\d+)$/);
-    if (req.method === 'GET' && (localMediaMatch || localSubjectMediaMatch)) {
+    const localKnowledgeAssetMatch = requestUrl.pathname.match(/^\/api\/local\/knowledge\/([^/]+)\/asset\/(.+)$/);
+    if (req.method === 'GET' && (localMediaMatch || localSubjectMediaMatch || localKnowledgeAssetMatch)) {
       if (!isTrustedLocalBrowserRequest(req)) {
         res.writeHead(403);
         res.end('Forbidden');
@@ -15272,6 +15274,18 @@ function startHttpServer() {
               ? String(subject.absoluteVoicePath || '')
               : String(subject.absoluteVideoPath || '');
           if (!filePath) throw new Error('Subject media not found');
+          contentType = mimeTypeForPreviewExtension(path.extname(filePath).slice(1));
+        } else if (localKnowledgeAssetMatch) {
+          const entryId = sanitizeKnowledgeEntryId(decodeURIComponent(localKnowledgeAssetMatch[1]), 'entry');
+          const relativeAssetPath = localKnowledgeAssetMatch[2]
+            .split('/')
+            .map((part) => decodeURIComponent(part))
+            .join(path.sep);
+          const noteDir = path.resolve(getKnowledgeRedbookDir(), entryId);
+          filePath = path.resolve(noteDir, relativeAssetPath);
+          if (!filePath.startsWith(`${noteDir}${path.sep}`)) {
+            throw new Error('Knowledge asset path is not allowed');
+          }
           contentType = mimeTypeForPreviewExtension(path.extname(filePath).slice(1));
         }
         const content = await fs.readFile(filePath);
@@ -15355,15 +15369,24 @@ function startHttpServer() {
               .filter(Boolean),
           )).slice(0, 1000);
           const existingIds: string[] = [];
+          const incompleteIds: string[] = [];
           for (const externalId of externalIds) {
             const entryId = sanitizeKnowledgeEntryId(externalId, 'entry');
             const metaPath = path.join(getKnowledgeRedbookDir(), entryId, 'meta.json');
             if (await fs.stat(metaPath).then((stat: fsSync.Stats) => stat.isFile()).catch(() => false)) {
               existingIds.push(externalId);
+              const meta = await fs.readFile(metaPath, 'utf-8')
+                .then((value: string) => JSON.parse(value) as Record<string, any>)
+                .catch(() => ({}));
+              const contentPath = path.join(getKnowledgeRedbookDir(), entryId, 'content.md');
+              const content = await fs.readFile(contentPath, 'utf-8').catch(() => '');
+              if (!String(meta.content || content || '').trim()) {
+                incompleteIds.push(externalId);
+              }
             }
           }
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true, existingIds }));
+          res.end(JSON.stringify({ success: true, existingIds, incompleteIds }));
         } catch (error) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: String(error) }));

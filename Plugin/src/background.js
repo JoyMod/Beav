@@ -2786,8 +2786,15 @@ async function findExistingKnowledgeEntryIds(externalIds) {
   ));
   if (ids.length === 0) return [];
   const response = await postKnowledgeJson('/entries/existing', { externalIds: ids }, 'entry-existing');
+  const incompleteIds = new Set(
+    Array.isArray(response?.incompleteIds)
+      ? response.incompleteIds.map((item) => normalizeText(item)).filter(Boolean)
+      : [],
+  );
   return Array.isArray(response?.existingIds)
-    ? response.existingIds.map((item) => normalizeText(item)).filter(Boolean)
+    ? response.existingIds
+        .map((item) => normalizeText(item))
+        .filter((item) => item && !incompleteIds.has(item))
     : [];
 }
 
@@ -6156,7 +6163,15 @@ async function collectXhsBloggerNotesViaApi(tabId, payload, options = {}) {
         world: 'MAIN',
         args: [note.urlInfo.href, note.urlInfo.id],
       });
-      const entryPayload = buildXhsNotePayloadFromFeed(feedResult, note.urlInfo);
+      let entryPayload = buildXhsNotePayloadFromFeed(feedResult, note.urlInfo);
+      if (!normalizeText(entryPayload?.content)) {
+        pluginWarn('xhs-blogger-notes-api-content-empty', {
+          noteId: normalizeText(note?.urlInfo?.id),
+          url: normalizeText(note?.urlInfo?.href),
+          fallback: 'detail-tab',
+        });
+        entryPayload = await extractXhsNoteFromTemporaryTab(note.urlInfo.href);
+      }
       await syncXhsTaskStep({
         current: results.length + failures.length,
         total: pendingNotes.length,
@@ -6347,6 +6362,24 @@ async function waitForTabComplete(tabId, timeoutMs = 18000) {
     const timer = setTimeout(() => finish(false), timeoutMs);
     chrome.tabs.onUpdated.addListener(listener);
   });
+}
+
+async function extractXhsNoteFromTemporaryTab(url) {
+  let tab = null;
+  try {
+    tab = await chrome.tabs.create({ url, active: false });
+    await waitForTabComplete(tab.id);
+    await sleepXhsTaskInterruptibly(900);
+    const payload = await runExtraction(tab.id, extractXhsNotePayload, { world: 'MAIN' });
+    if (!normalizeText(payload?.content)) {
+      throw new Error('详情页未提取到笔记正文');
+    }
+    return payload;
+  } finally {
+    if (tab?.id) {
+      await chrome.tabs.remove(tab.id).catch(() => {});
+    }
+  }
 }
 
 async function collectXhsNoteLinks(urlsInput, options = {}) {
