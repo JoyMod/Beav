@@ -165,6 +165,7 @@ async function handleMethod(method, params = {}) {
       return {
         ok: true,
         hostName: HOST_NAME,
+        appVersion: String(desktopBridge?.appVersion || desktopBridge?.health?.appVersion || ''),
         now: new Date().toISOString(),
         nativeConnected,
         desktopBridge,
@@ -185,6 +186,7 @@ async function handleMethod(method, params = {}) {
       return {
         ok: true,
         hostName: HOST_NAME,
+        appVersion: String(desktopBridge?.appVersion || desktopBridge?.health?.appVersion || ''),
         pid: process.pid,
         node: process.version,
         platform: process.platform,
