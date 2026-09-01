@@ -521,7 +521,10 @@ export function Knowledge({ onNavigateToRedClaw, isEmbedded = false, isActive = 
         setIsVisualIndexEnabled(nextEnabled);
         setIsVisualIndexSettingSaving(true);
         try {
-            await window.ipcRenderer.saveSettings({ visual_index_enabled: nextEnabled });
+            const result = await window.ipcRenderer.saveSettings({ visual_index_enabled: nextEnabled });
+            if (result && typeof result === 'object' && 'success' in result && result.success === false) {
+                throw new Error(String('error' in result ? result.error : '保存失败'));
+            }
             await refreshIndexStatus();
         } catch (error) {
             console.error('Failed to save visual index setting:', error);

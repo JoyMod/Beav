@@ -14606,6 +14606,7 @@ let httpServer: http.Server | null = null;
 
 const LOCAL_BROWSER_CHANNELS = new Set([
   'db:get-settings',
+  'db:save-settings',
   'spaces:list',
   'media:list',
   'subjects:list',
@@ -14725,6 +14726,15 @@ async function invokeLocalBrowserDataChannel(channel: string, rawPayload: unknow
     switch (channel) {
       case 'db:get-settings':
         return exposeSettingsToLocalBrowser();
+      case 'db:save-settings': {
+        const keys = Object.keys(payload);
+        if (keys.length !== 1 || keys[0] !== 'visual_index_enabled' || typeof payload.visual_index_enabled !== 'boolean') {
+          throw new Error('Local browser can only update visual_index_enabled');
+        }
+        const result = saveSettings({ visual_index_enabled: payload.visual_index_enabled });
+        broadcastSettingsUpdated();
+        return result;
+      }
       case 'spaces:list':
         return { spaces: listSpaces(), activeSpaceId: getActiveSpaceId() };
       case 'media:list': {

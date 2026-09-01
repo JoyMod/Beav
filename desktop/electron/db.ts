@@ -132,6 +132,7 @@ const initDb = () => {
       search_provider TEXT,
       search_endpoint TEXT,
       search_api_key TEXT,
+      visual_index_enabled INTEGER,
       proxy_enabled INTEGER,
       proxy_url TEXT,
       proxy_bypass TEXT,
@@ -553,6 +554,9 @@ const initDb = () => {
     db.exec(`ALTER TABLE settings ADD COLUMN search_api_key TEXT;`);
   } catch { /* Column already exists */ }
   try {
+    db.exec(`ALTER TABLE settings ADD COLUMN visual_index_enabled INTEGER;`);
+  } catch { /* Column already exists */ }
+  try {
     db.exec(`ALTER TABLE settings ADD COLUMN proxy_enabled INTEGER;`);
   } catch { /* Column already exists */ }
   try {
@@ -702,6 +706,7 @@ export const saveSettings = (settings: {
     search_provider?: string;
     search_endpoint?: string;
     search_api_key?: string;
+    visual_index_enabled?: boolean;
     proxy_enabled?: boolean;
     proxy_url?: string;
     proxy_bypass?: string;
@@ -739,8 +744,8 @@ export const saveSettings = (settings: {
   chat_max_tokens_deepseek?: number;
 }) => {
   const stmt = db.prepare(`
-    INSERT INTO settings (id, api_endpoint, api_key, model_name, model_name_wander, model_name_chatroom, model_name_knowledge, model_name_redclaw, search_provider, search_endpoint, search_api_key, proxy_enabled, proxy_url, proxy_bypass, role_mapping, workspace_dir, active_space_id, transcription_model, transcription_endpoint, transcription_key, embedding_endpoint, embedding_key, embedding_model, ai_sources_json, ai_model_routes_json, default_ai_source_id, image_provider, image_endpoint, image_api_key, image_model, video_endpoint, video_api_key, video_model, image_provider_template, image_aspect_ratio, image_size, image_quality, mcp_servers_json, ecommerce_platforms_json, redclaw_compact_target_tokens, wander_deep_think_enabled, debug_log_enabled, developer_mode_enabled, developer_mode_unlocked_at, chat_max_tokens_default, chat_max_tokens_deepseek)
-    VALUES (1, @api_endpoint, @api_key, @model_name, @model_name_wander, @model_name_chatroom, @model_name_knowledge, @model_name_redclaw, @search_provider, @search_endpoint, @search_api_key, @proxy_enabled, @proxy_url, @proxy_bypass, @role_mapping, @workspace_dir, @active_space_id, @transcription_model, @transcription_endpoint, @transcription_key, @embedding_endpoint, @embedding_key, @embedding_model, @ai_sources_json, @ai_model_routes_json, @default_ai_source_id, @image_provider, @image_endpoint, @image_api_key, @image_model, @video_endpoint, @video_api_key, @video_model, @image_provider_template, @image_aspect_ratio, @image_size, @image_quality, @mcp_servers_json, @ecommerce_platforms_json, @redclaw_compact_target_tokens, @wander_deep_think_enabled, @debug_log_enabled, @developer_mode_enabled, @developer_mode_unlocked_at, @chat_max_tokens_default, @chat_max_tokens_deepseek)
+    INSERT INTO settings (id, api_endpoint, api_key, model_name, model_name_wander, model_name_chatroom, model_name_knowledge, model_name_redclaw, search_provider, search_endpoint, search_api_key, visual_index_enabled, proxy_enabled, proxy_url, proxy_bypass, role_mapping, workspace_dir, active_space_id, transcription_model, transcription_endpoint, transcription_key, embedding_endpoint, embedding_key, embedding_model, ai_sources_json, ai_model_routes_json, default_ai_source_id, image_provider, image_endpoint, image_api_key, image_model, video_endpoint, video_api_key, video_model, image_provider_template, image_aspect_ratio, image_size, image_quality, mcp_servers_json, ecommerce_platforms_json, redclaw_compact_target_tokens, wander_deep_think_enabled, debug_log_enabled, developer_mode_enabled, developer_mode_unlocked_at, chat_max_tokens_default, chat_max_tokens_deepseek)
+    VALUES (1, @api_endpoint, @api_key, @model_name, @model_name_wander, @model_name_chatroom, @model_name_knowledge, @model_name_redclaw, @search_provider, @search_endpoint, @search_api_key, @visual_index_enabled, @proxy_enabled, @proxy_url, @proxy_bypass, @role_mapping, @workspace_dir, @active_space_id, @transcription_model, @transcription_endpoint, @transcription_key, @embedding_endpoint, @embedding_key, @embedding_model, @ai_sources_json, @ai_model_routes_json, @default_ai_source_id, @image_provider, @image_endpoint, @image_api_key, @image_model, @video_endpoint, @video_api_key, @video_model, @image_provider_template, @image_aspect_ratio, @image_size, @image_quality, @mcp_servers_json, @ecommerce_platforms_json, @redclaw_compact_target_tokens, @wander_deep_think_enabled, @debug_log_enabled, @developer_mode_enabled, @developer_mode_unlocked_at, @chat_max_tokens_default, @chat_max_tokens_deepseek)
     ON CONFLICT(id) DO UPDATE SET
       api_endpoint = @api_endpoint,
       api_key = @api_key,
@@ -752,6 +757,7 @@ export const saveSettings = (settings: {
       search_provider = @search_provider,
       search_endpoint = @search_endpoint,
       search_api_key = @search_api_key,
+      visual_index_enabled = @visual_index_enabled,
       proxy_enabled = @proxy_enabled,
       proxy_url = @proxy_url,
       proxy_bypass = @proxy_bypass,
@@ -799,6 +805,7 @@ export const saveSettings = (settings: {
     search_provider?: string;
     search_endpoint?: string;
     search_api_key?: string;
+    visual_index_enabled?: boolean;
     proxy_enabled?: boolean;
     proxy_url?: string;
     proxy_bypass?: string;
@@ -853,6 +860,9 @@ export const saveSettings = (settings: {
     search_provider: String(settings.search_provider ?? current?.search_provider ?? 'duckduckgo').trim() || 'duckduckgo',
     search_endpoint: String(settings.search_endpoint ?? current?.search_endpoint ?? '').trim(),
     search_api_key: encryptSecret(settings.search_api_key ?? current?.search_api_key),
+    visual_index_enabled: settings.visual_index_enabled === undefined
+      ? (current?.visual_index_enabled ? 1 : 0)
+      : (settings.visual_index_enabled ? 1 : 0),
     proxy_enabled: settings.proxy_enabled === undefined
       ? (current?.proxy_enabled ? 1 : 0)
       : (settings.proxy_enabled ? 1 : 0),
@@ -928,6 +938,7 @@ export const getSettings = () => {
     search_provider?: string;
     search_endpoint?: string;
     search_api_key?: string;
+    visual_index_enabled?: number;
     proxy_enabled?: number;
     proxy_url?: string;
     proxy_bypass?: string;
