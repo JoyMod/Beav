@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from 'react';
-import { Search, Trash2, Image, Heart, MessageCircle, X, ChevronLeft, ChevronRight, Play, FileText, ExternalLink, Download, RefreshCw, Sparkles, Star, BookmarkPlus, FolderPlus, FolderOpen, Plus, Loader2, Users, ArrowDownUp, CheckSquare2, Square, Info } from 'lucide-react';
+import { Search, Trash2, Image, Heart, MessageCircle, X, ChevronLeft, ChevronRight, Play, FileText, ExternalLink, RefreshCw, Sparkles, Star, BookmarkPlus, FolderPlus, FolderOpen, Plus, Loader2, Users, ArrowDownUp, CheckSquare2, Square, Info } from 'lucide-react';
 import { clsx } from 'clsx';
 import ReactMarkdown from 'react-markdown';
 import type { PendingChatMessage } from '../features/app-shell/types';
@@ -66,8 +66,6 @@ interface SettingsShape {
     active_space_id?: string;
     visual_index_enabled?: boolean;
 }
-
-const BROWSER_PLUGIN_DOWNLOAD_URL = APP_BRAND.downloadUrl || 'https://github.com/JoyMod/Beav/releases';
 
 function ObsidianIcon({ className }: { className?: string }) {
     return (
@@ -1838,15 +1836,20 @@ export function Knowledge({ onNavigateToRedClaw, isEmbedded = false, isActive = 
         );
     };
 
-    const handleOpenBrowserPluginDownload = useCallback(async () => {
+    const handleOpenBrowserPluginDir = useCallback(async () => {
         try {
-            const result = await window.ipcRenderer.openAppReleasePage(BROWSER_PLUGIN_DOWNLOAD_URL);
+            const prepared = await window.ipcRenderer.browserPlugin.prepare();
+            if (!prepared?.success) {
+                void appAlert(prepared?.error || '准备浏览器插件失败');
+                return;
+            }
+            const result = await window.ipcRenderer.browserPlugin.openDir();
             if (!result?.success) {
-                void appAlert(result?.error || '打开插件下载页面失败');
+                void appAlert(result?.error || '打开浏览器插件目录失败');
             }
         } catch (error) {
-            console.error('Failed to open browser plugin download page:', error);
-            void appAlert('打开插件下载页面失败');
+            console.error('Failed to prepare browser plugin:', error);
+            void appAlert('准备浏览器插件失败');
         }
     }, []);
 
@@ -2594,12 +2597,11 @@ export function Knowledge({ onNavigateToRedClaw, isEmbedded = false, isActive = 
                                     <div className="mt-7 flex items-center justify-center">
                                         <button
                                             type="button"
-                                            onClick={() => void handleOpenBrowserPluginDownload()}
+                                            onClick={() => void handleOpenBrowserPluginDir()}
                                             className="inline-flex h-10 items-center gap-2 rounded-xl bg-accent-primary px-4 text-[13px] font-bold text-white shadow-lg shadow-accent-primary/20 transition-all hover:bg-accent-hover active:scale-95"
                                         >
-                                            <Download className="h-4 w-4" />
-                                            下载浏览器插件
-                                            <ExternalLink className="h-3.5 w-3.5 opacity-80" />
+                                            <FolderOpen className="h-4 w-4" />
+                                            打开插件目录
                                         </button>
                                     </div>
                                     <div className="mt-4 w-full max-w-[480px] rounded-xl border border-border/70 bg-surface-secondary/45 px-4 py-3 text-left">
@@ -2607,8 +2609,8 @@ export function Knowledge({ onNavigateToRedClaw, isEmbedded = false, isActive = 
                                             插件安装
                                         </div>
                                         <ol className="mt-2 space-y-1.5 text-[12px] font-medium leading-5 text-text-tertiary">
-                                            <li><span className="font-bold text-text-primary">1.</span> 点击“下载浏览器插件”，在下载页获取插件压缩包。</li>
-                                            <li><span className="font-bold text-text-primary">2.</span> 解压后打开 Chrome / Edge 的扩展管理页。</li>
+                                            <li><span className="font-bold text-text-primary">1.</span> 点击“打开插件目录”，应用会自动编译并准备插件。</li>
+                                            <li><span className="font-bold text-text-primary">2.</span> 打开 Chrome / Edge 的扩展管理页。</li>
                                             <li><span className="font-bold text-text-primary">3.</span> 开启开发者模式，选择“加载已解压的扩展程序”。</li>
                                         </ol>
                                     </div>

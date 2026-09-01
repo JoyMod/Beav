@@ -1,9 +1,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const desktopDir = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(desktopDir, '..');
 const sourceDir = path.join(repoRoot, 'Plugin');
+const extensionDir = path.join(sourceDir, 'dist', 'extension');
 const runtimeRoot = path.join(desktopDir, '.plugin-runtime');
 const targetDir = path.join(runtimeRoot, 'browser-extension');
 
@@ -18,5 +20,21 @@ if (!fs.existsSync(sourceDir)) {
   process.exit(0);
 }
 
-copyDirectory(sourceDir, targetDir);
+for (const script of ['sync-manifest-version.mjs', 'build.mjs']) {
+  const result = spawnSync(process.execPath, [path.join(sourceDir, 'scripts', script)], {
+    cwd: sourceDir,
+    stdio: 'inherit',
+  });
+  if (result.status !== 0) {
+    console.error(`[prepare-plugin-runtime] Plugin build failed: ${script}`);
+    process.exit(result.status || 1);
+  }
+}
+
+if (!fs.existsSync(path.join(extensionDir, 'manifest.json'))) {
+  console.error(`[prepare-plugin-runtime] Built extension manifest not found: ${extensionDir}`);
+  process.exit(1);
+}
+
+copyDirectory(extensionDir, targetDir);
 console.log(`[prepare-plugin-runtime] synced browser extension -> ${targetDir}`);
