@@ -754,17 +754,94 @@ function VideoMediaThumb({
     thumbnailUrl?: string;
     label: string;
 }) {
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+    const [frameReady, setFrameReady] = useState(false);
+    const [loadFailed, setLoadFailed] = useState(false);
     const resolvedThumbnailUrl = thumbnailUrl ? resolveAssetUrl(thumbnailUrl) : '';
     if (resolvedThumbnailUrl) {
-        return <img src={resolvedThumbnailUrl} alt={label} className="h-full w-full object-cover" />;
+        return <MediaImageThumb sourceUrl={resolvedThumbnailUrl} label={label} />;
     }
     const resolvedSourceUrl = sourceUrl ? resolveAssetUrl(sourceUrl) : '';
     if (resolvedSourceUrl) {
-        return <video src={resolvedSourceUrl} className="h-full w-full bg-black object-cover" muted playsInline preload="metadata" />;
+        return (
+            <div className="relative h-full w-full bg-surface-secondary/60">
+                {!frameReady && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-text-tertiary">
+                        <Clapperboard className={clsx('h-6 w-6', !loadFailed && 'animate-pulse')} />
+                        {loadFailed && <span className="text-[11px]">视频预览加载失败</span>}
+                    </div>
+                )}
+                <video
+                    ref={videoRef}
+                    src={resolvedSourceUrl}
+                    aria-label={label}
+                    className={clsx('h-full w-full object-cover transition-opacity', frameReady ? 'opacity-100' : 'opacity-0')}
+                    muted
+                    playsInline
+                    preload="auto"
+                    onLoadedData={() => {
+                        const video = videoRef.current;
+                        if (!video) return;
+                        const previewTime = Math.min(0.35, Math.max(0, video.duration - 0.05));
+                        if (previewTime > 0.05) {
+                            video.currentTime = previewTime;
+                        } else {
+                            setFrameReady(true);
+                        }
+                    }}
+                    onSeeked={() => setFrameReady(true)}
+                    onError={() => setLoadFailed(true)}
+                />
+            </div>
+        );
     }
     return (
         <div className="flex h-full w-full items-center justify-center text-text-tertiary">
             <Clapperboard className="h-6 w-6" />
+        </div>
+    );
+}
+
+function MediaImageThumb({ sourceUrl, label }: { sourceUrl: string; label: string }) {
+    const [attempt, setAttempt] = useState(0);
+    const [loaded, setLoaded] = useState(false);
+    const [failed, setFailed] = useState(false);
+    const resolvedSourceUrl = resolveAssetUrl(sourceUrl);
+    const retryUrl = attempt === 0
+        ? resolvedSourceUrl
+        : `${resolvedSourceUrl}${resolvedSourceUrl.includes('?') ? '&' : '?'}preview_retry=${attempt}`;
+
+    useEffect(() => {
+        setAttempt(0);
+        setLoaded(false);
+        setFailed(false);
+    }, [resolvedSourceUrl]);
+
+    return (
+        <div className="relative h-full w-full bg-surface-secondary/60">
+            {!loaded && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-text-tertiary">
+                    <ImagePlus className={clsx('h-6 w-6', !failed && 'animate-pulse')} />
+                    {failed && <span className="text-[11px]">图片预览加载失败</span>}
+                </div>
+            )}
+            <img
+                key={retryUrl}
+                src={retryUrl}
+                alt={label}
+                className={clsx('h-full w-full object-cover transition-opacity', loaded ? 'opacity-100' : 'opacity-0')}
+                onLoad={() => {
+                    setLoaded(true);
+                    setFailed(false);
+                }}
+                onError={() => {
+                    if (attempt < 2) {
+                        window.setTimeout(() => setAttempt((current) => current + 1), 350 * (attempt + 1));
+                        return;
+                    }
+                    setFailed(true);
+                }}
+            />
         </div>
     );
 }
@@ -4061,7 +4138,7 @@ export function Subjects({ isActive = true, onReturnHome, onClose, variant = 'pa
                                                             label={asset.title || asset.id}
                                                         />
                                                     ) : (
-                                                        <img src={previewUrl} alt={asset.title || asset.id} className="h-full w-full object-cover" />
+                                                        <MediaImageThumb sourceUrl={previewUrl} label={asset.title || asset.id} />
                                                     )
                                                 ) : (
                                                     <div className="flex h-full w-full items-center justify-center text-text-tertiary">
