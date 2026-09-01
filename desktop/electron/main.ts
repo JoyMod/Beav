@@ -15272,7 +15272,9 @@ function startHttpServer() {
         res.end(JSON.stringify({
           success: true,
           status: 'ok',
-          app: 'RedConvert',
+          service: 'browser-data-ai',
+          app: '竹叶自媒体平台',
+          appVersion: app.getVersion(),
           counts: {
             redbook: countTruthyDirectoryEntries(redbookDirs.filter((entry: fsSync.Dirent) => entry.isDirectory())),
             youtube: countTruthyDirectoryEntries(youtubeDirs.filter((entry: fsSync.Dirent) => entry.isDirectory())),

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HOST_NAME = 'com.redbox.browser_control';
-const DEFAULT_API_BASE = '';
+const DEFAULT_API_BASE = 'http://127.0.0.1:23456/api/knowledge';
 const STATE_ROOT = process.env.REDBOX_BROWSER_CONTROL_STATE_DIR || (
   process.platform === 'darwin'
     ? path.join(os.homedir(), 'Library/Application Support/RedBox/native-host')
@@ -68,6 +68,66 @@ async function requestJson(url, options = {}) {
   return body;
 }
 
+async function desktopBridgeStatus() {
+  try {
+    const health = await requestJson(`${await resolveApiBase()}/health`, {
+      signal: AbortSignal.timeout(1_500),
+    });
+    return {
+      connected: true,
+      availability: 'ready',
+      phase: 'local_api',
+      appVersion: String(health?.appVersion || ''),
+      health,
+    };
+  } catch (error) {
+    return {
+      connected: false,
+      availability: 'app_not_running',
+      phase: 'local_api',
+      errorCode: 'APP_BRIDGE_UNAVAILABLE',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function requestDesktopAction(method, params = {}) {
+  const apiBase = await resolveApiBase();
+  const payload = params?.payload && typeof params.payload === 'object'
+    ? params.payload
+    : {};
+  if (method === 'desktop.health') {
+    const knowledge = await requestJson(`${apiBase}/health`);
+    return {
+      success: true,
+      appVersion: String(knowledge?.appVersion || ''),
+      bridgeProtocolVersion: 1,
+      knowledge,
+    };
+  }
+  if (method === 'desktop.context') {
+    return {
+      schemaVersion: 1,
+      revision: 'local-personal-workspace',
+      initialization: { state: 'ready' },
+      ingest: { allowed: true, reason: 'READY' },
+    };
+  }
+  if (method === 'knowledge.ingestEntry') {
+    return await requestJson(`${apiBase}/entries`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+  if (method === 'knowledge.ingestMediaAssets') {
+    return await requestJson(`${apiBase}/media-assets`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+  throw new Error(`Unsupported desktop action: ${method}`);
+}
+
 async function resolveApiBase() {
   const candidates = [
     process.env.REDBOX_BROWSER_CONTROL_API,
@@ -88,9 +148,26 @@ async function resolveApiBase() {
 
 async function handleMethod(method, params = {}) {
   switch (method) {
-    case 'ping':
-      return { ok: true, hostName: HOST_NAME, now: new Date().toISOString() };
-    case 'getInfo':
+    case 'ping': {
+      const desktopBridge = await desktopBridgeStatus();
+      return {
+        ok: true,
+        hostName: HOST_NAME,
+        now: new Date().toISOString(),
+        nativeConnected,
+        desktopBridge,
+        capabilities: {
+          hostMethods: [
+            'desktop.health',
+            'desktop.context',
+            'knowledge.ingestEntry',
+            'knowledge.ingestMediaAssets',
+          ],
+        },
+      };
+    }
+    case 'getInfo': {
+      const desktopBridge = await desktopBridgeStatus();
       return {
         ok: true,
         hostName: HOST_NAME,
@@ -98,7 +175,15 @@ async function handleMethod(method, params = {}) {
         node: process.version,
         platform: process.platform,
         apiDefault: DEFAULT_API_BASE,
+        nativeConnected,
+        desktopBridge,
       };
+    }
+    case 'desktop.health':
+    case 'desktop.context':
+    case 'knowledge.ingestEntry':
+    case 'knowledge.ingestMediaAssets':
+      return await requestDesktopAction(method, params);
     case 'ensureXwowAppServer':
     case 'ensureCodexAppServer': {
       const apiBase = await resolveApiBase();
@@ -132,6 +217,10 @@ function isHostMethod(method = '') {
     'onDownloadChange',
     'onBrowserLifecycleEvent',
     'onBrowserSessionEvent',
+    'desktop.health',
+    'desktop.context',
+    'knowledge.ingestEntry',
+    'knowledge.ingestMediaAssets',
   ].includes(String(method || ''));
 }
 
