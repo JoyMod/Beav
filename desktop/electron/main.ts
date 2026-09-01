@@ -15324,6 +15324,92 @@ function startHttpServer() {
       return;
     }
 
+    if (req.method === 'POST' && req.url === '/api/knowledge/entries/existing') {
+      let body = '';
+      req.on('data', (chunk) => { body += chunk; });
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}') as { externalIds?: string[] };
+          const externalIds = Array.from(new Set(
+            (Array.isArray(payload.externalIds) ? payload.externalIds : [])
+              .map((item) => String(item || '').trim())
+              .filter(Boolean),
+          )).slice(0, 1000);
+          const existingIds: string[] = [];
+          for (const externalId of externalIds) {
+            const entryId = sanitizeKnowledgeEntryId(externalId, 'entry');
+            const metaPath = path.join(getKnowledgeRedbookDir(), entryId, 'meta.json');
+            if (await fs.stat(metaPath).then((stat: fsSync.Stats) => stat.isFile()).catch(() => false)) {
+              existingIds.push(externalId);
+            }
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, existingIds }));
+        } catch (error) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: String(error) }));
+        }
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/knowledge/xhs/v2/entries') {
+      let body = '';
+      req.on('data', (chunk) => { body += chunk; });
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}') as Record<string, any>;
+          const note = payload.note && typeof payload.note === 'object' ? payload.note : {};
+          const author = note.author && typeof note.author === 'object' ? note.author : {};
+          const noteAssets = note.assets && typeof note.assets === 'object' ? note.assets : {};
+          const comments = payload.comments && typeof payload.comments === 'object' ? payload.comments : {};
+          const result = await persistKnowledgeEntry({
+            kind: String(note.noteType || '').trim() === 'video' ? 'xhs-video' : 'xhs-note',
+            source: {
+              sourceLink: String(payload.source?.sourceLink || payload.source?.sourceUrl || '').trim(),
+              sourceUrl: String(payload.source?.sourceUrl || payload.source?.sourceLink || '').trim(),
+              sourceDomain: String(payload.source?.sourceDomain || 'www.xiaohongshu.com').trim(),
+              externalId: String(note.noteId || payload.source?.externalId || '').trim(),
+            },
+            content: {
+              title: String(note.title || '').trim(),
+              text: String(note.text || '').trim(),
+              author: String(author.nickname || '').trim(),
+              authorProfileUrl: String(author.profileUrl || '').trim(),
+              siteName: '小红书',
+              tags: ['小红书'],
+              stats: note.stats,
+              commentsSnapshot: Array.isArray(comments.items) ? comments.items : [],
+            },
+            assets: {
+              coverUrl: String(noteAssets.coverUrl || '').trim(),
+              imageUrls: Array.isArray(noteAssets.imageUrls) ? noteAssets.imageUrls : [],
+              videoUrl: String(noteAssets.videoUrl || '').trim(),
+            },
+            options: {
+              allowUpdate: payload.options?.allowUpdate !== false,
+              transcribe: Boolean(payload.options?.transcribe),
+            },
+          });
+          if (!result.success || !result.entryId) {
+            throw new Error(result.error || '保存失败');
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            entryId: result.entryId,
+            duplicate: Boolean(result.duplicate),
+            updated: Boolean(result.updated),
+            comments: { captured: Array.isArray(comments.items) ? comments.items.length : 0 },
+          }));
+        } catch (error) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: String(error) }));
+        }
+      });
+      return;
+    }
+
     if (req.method === 'POST' && req.url === '/api/knowledge/media-assets') {
       let body = '';
       req.on('data', (chunk) => { body += chunk; });

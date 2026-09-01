@@ -2004,14 +2004,6 @@ async function writeXhsBloggerProgressState(nextState) {
   return normalized;
 }
 
-async function getCollectedXhsNoteIdsForBlogger(userIdInput) {
-  const userId = normalizeText(userIdInput);
-  if (!userId) return new Set();
-  const state = await readXhsBloggerProgressState();
-  const entry = sanitizeXhsBloggerProgressEntry(state?.[userId], userId);
-  return new Set(Array.isArray(entry?.noteIds) ? entry.noteIds : []);
-}
-
 async function markCollectedXhsNotesForBlogger({ userId, source, nickname, noteIds }) {
   const normalizedUserId = normalizeText(userId);
   const normalizedNoteIds = Array.from(new Set(
@@ -2032,6 +2024,27 @@ async function markCollectedXhsNotesForBlogger({ userId, source, nickname, noteI
     source: normalizeText(source) || normalizeText(existing?.source),
     nickname: normalizeText(nickname) || normalizeText(existing?.nickname),
     noteIds: mergedNoteIds,
+    createdAt: normalizeText(existing?.createdAt) || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }, normalizedUserId);
+  await writeXhsBloggerProgressState({
+    ...state,
+    [normalizedUserId]: nextEntry,
+  });
+  return nextEntry;
+}
+
+async function replaceCollectedXhsNotesForBlogger({ userId, source, nickname, noteIds }) {
+  const normalizedUserId = normalizeText(userId);
+  if (!normalizedUserId) return null;
+  const state = await readXhsBloggerProgressState();
+  const existing = sanitizeXhsBloggerProgressEntry(state?.[normalizedUserId], normalizedUserId);
+  const nextEntry = sanitizeXhsBloggerProgressEntry({
+    ...existing,
+    userId: normalizedUserId,
+    source: normalizeText(source) || normalizeText(existing?.source),
+    nickname: normalizeText(nickname) || normalizeText(existing?.nickname),
+    noteIds,
     createdAt: normalizeText(existing?.createdAt) || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }, normalizedUserId);
@@ -2707,6 +2720,7 @@ function knowledgeNativeMethod(path, method) {
   const methods = {
     'GET /health': 'desktop.health',
     'POST /entries': 'knowledge.ingestEntry',
+    'POST /entries/existing': 'knowledge.findExistingEntries',
     'POST /xhs/v2/entries': 'knowledge.ingestXhsEntryV2',
     'POST /zhihu/answers': 'knowledge.ingestZhihuAnswer',
     'POST /zhihu/articles': 'knowledge.ingestZhihuArticle',
@@ -2762,6 +2776,19 @@ async function postKnowledgeEntry(payload) {
     updated: Boolean(response?.updated),
   });
   return response;
+}
+
+async function findExistingKnowledgeEntryIds(externalIds) {
+  const ids = Array.from(new Set(
+    (Array.isArray(externalIds) ? externalIds : [])
+      .map((item) => normalizeText(item))
+      .filter(Boolean),
+  ));
+  if (ids.length === 0) return [];
+  const response = await postKnowledgeJson('/entries/existing', { externalIds: ids }, 'entry-existing');
+  return Array.isArray(response?.existingIds)
+    ? response.existingIds.map((item) => normalizeText(item)).filter(Boolean)
+    : [];
 }
 
 async function postKnowledgeZhihuAnswer(payload) {
@@ -5973,7 +6000,16 @@ async function collectXhsBloggerNotesViaApi(tabId, payload, options = {}) {
   if (notes.length === 0) {
     throw new Error('当前博主页未识别到可用于 API 采集的笔记链接');
   }
-  const collectedNoteIds = await getCollectedXhsNoteIdsForBlogger(payloadState?.userId);
+  const candidateNoteIds = notes
+    .map((item) => parseXhsNoteUrl(item?.url)?.id)
+    .filter(Boolean);
+  const collectedNoteIds = new Set(await findExistingKnowledgeEntryIds(candidateNoteIds));
+  await replaceCollectedXhsNotesForBlogger({
+    userId: payloadState?.userId,
+    source: payloadState?.source,
+    nickname: titleName,
+    noteIds: Array.from(collectedNoteIds),
+  });
   let candidateLimit = Math.max(
     normalizePositiveInteger(options.limit, 1),
     normalizePositiveInteger(options.limit, 1) + collectedNoteIds.size,
@@ -6056,7 +6092,7 @@ async function collectXhsBloggerNotesViaApi(tabId, payload, options = {}) {
       status: 'completed',
       count: 0,
       failed: 0,
-      summary: `无需采集，已自动跳过 ${skippedNotes.length} 条已采集笔记`,
+      summary: `本地已存在 ${skippedNotes.length} 条，无需重复采集`,
       payload: {
         results: [],
         failures: [],
@@ -6067,7 +6103,7 @@ async function collectXhsBloggerNotesViaApi(tabId, payload, options = {}) {
       },
     });
     return {
-      success: true,
+      success: skippedNotes.length > 0,
       mode: 'xhs-blogger-notes',
       completed: true,
       count: 0,
@@ -6128,6 +6164,9 @@ async function collectXhsBloggerNotesViaApi(tabId, payload, options = {}) {
         mode: 'api',
       });
       const response = options.saveToRedBox !== false ? await postKnowledgeEntry(buildXhsEntry(entryPayload)) : null;
+      if (options.saveToRedBox !== false && !normalizeText(response?.entryId)) {
+        throw new Error('桌面端未返回本地知识条目 ID，无法确认保存成功');
+      }
       const accountPost = buildXhsAccountPostFromEntry(entryPayload);
       if (response?.entryId) {
         accountPost.knowledgeEntryId = normalizeText(response.entryId);
@@ -6251,7 +6290,7 @@ async function collectXhsBloggerNotesViaApi(tabId, payload, options = {}) {
   });
 
   return {
-    success: true,
+    success: failures.length === 0 || results.length > 0,
     mode: 'xhs-blogger-notes',
     completed: failures.length === 0,
     count: results.length,

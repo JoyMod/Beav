@@ -119,6 +119,18 @@ async function requestDesktopAction(method, params = {}) {
       body: JSON.stringify(payload),
     });
   }
+  if (method === 'knowledge.findExistingEntries') {
+    return await requestJson(`${apiBase}/entries/existing`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+  if (method === 'knowledge.ingestXhsEntryV2') {
+    return await requestJson(`${apiBase}/xhs/v2/entries`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
   if (method === 'knowledge.ingestMediaAssets') {
     return await requestJson(`${apiBase}/media-assets`, {
       method: 'POST',
@@ -161,6 +173,8 @@ async function handleMethod(method, params = {}) {
             'desktop.health',
             'desktop.context',
             'knowledge.ingestEntry',
+            'knowledge.findExistingEntries',
+            'knowledge.ingestXhsEntryV2',
             'knowledge.ingestMediaAssets',
           ],
         },
@@ -182,6 +196,8 @@ async function handleMethod(method, params = {}) {
     case 'desktop.health':
     case 'desktop.context':
     case 'knowledge.ingestEntry':
+    case 'knowledge.findExistingEntries':
+    case 'knowledge.ingestXhsEntryV2':
     case 'knowledge.ingestMediaAssets':
       return await requestDesktopAction(method, params);
     case 'ensureXwowAppServer':
@@ -220,6 +236,8 @@ function isHostMethod(method = '') {
     'desktop.health',
     'desktop.context',
     'knowledge.ingestEntry',
+    'knowledge.findExistingEntries',
+    'knowledge.ingestXhsEntryV2',
     'knowledge.ingestMediaAssets',
   ].includes(String(method || ''));
 }

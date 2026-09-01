@@ -922,7 +922,7 @@ function summarizeActionResponse(response, fallback) {
     return response.duplicate ? '知识库中已存在' : '已保存到 竹叶自媒体平台';
   }
   if (response?.mode === 'xhs-blogger-notes') {
-    return `博主笔记 ${Number(response.count || 0)} 条，失败 ${Number(response.failed || 0)} 条`;
+    return `本地保存 ${Number(response.count || 0)} 条，已存在 ${Number(response.skipped || 0)} 条，失败 ${Number(response.failed || 0)} 条`;
   }
   if (response?.mode === 'xhs-download') {
     return `下载 ${Number(response.count || 0)} 个素材`;
