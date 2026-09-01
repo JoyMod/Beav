@@ -11438,7 +11438,7 @@ ipcMain.handle('knowledge:get-file-index-scope-status', async (_event, scopeId: 
   }
 });
 
-ipcMain.handle('knowledge:list-page', async (_, payload?: {
+async function listKnowledgeCatalogPage(payload?: {
   payload?: {
     cursor?: string | null;
     limit?: number;
@@ -11446,7 +11446,7 @@ ipcMain.handle('knowledge:list-page', async (_, payload?: {
     query?: string;
     sort?: string;
   };
-}) => {
+}) {
   const query = String(payload?.payload?.query || '').trim().toLowerCase();
   const kind = String(payload?.payload?.kind || '').trim();
   const sort = String(payload?.payload?.sort || 'updated-desc').trim();
@@ -11492,7 +11492,9 @@ ipcMain.handle('knowledge:list-page', async (_, payload?: {
     total: filtered.length,
     kindCounts,
   };
-});
+}
+
+ipcMain.handle('knowledge:list-page', async (_, payload) => listKnowledgeCatalogPage(payload));
 
 ipcMain.handle('knowledge:get-item-detail', async (_, payload?: {
   payload?: {
@@ -14613,6 +14615,8 @@ const LOCAL_BROWSER_CHANNELS = new Set([
   'subjects:get',
   'subjects:search',
   'subjects:categories:list',
+  'knowledge:list-page',
+  'knowledge:get-index-status',
 ]);
 
 const LOCAL_BROWSER_ORIGINS = new Set([
@@ -14763,6 +14767,21 @@ async function invokeLocalBrowserDataChannel(channel: string, rawPayload: unknow
       }
       case 'subjects:categories:list':
         return { success: true, categories: await listSubjectCategories() };
+      case 'knowledge:list-page':
+        return await listKnowledgeCatalogPage(payload);
+      case 'knowledge:get-index-status': {
+        const { items } = await buildKnowledgeCatalogItems();
+        const failedCount = items.filter((item) => item.status === 'failed').length;
+        const pendingCount = items.filter((item) => item.status === 'processing').length;
+        return {
+          indexedCount: Math.max(0, items.length - failedCount - pendingCount),
+          pendingCount,
+          failedCount,
+          lastIndexedAt: items[0]?.updatedAt || null,
+          isBuilding: pendingCount > 0,
+          lastError: null,
+        };
+      }
     }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
