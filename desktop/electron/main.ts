@@ -1569,6 +1569,13 @@ const registerLocalAssetProtocols = () => {
       }
     }
 
+    const extension = path.extname(resolvedPath).slice(1);
+    if (previewKindForExtension(extension, true) === 'image') {
+      const content = await fs.readFile(resolvedPath);
+      return new Response(new Uint8Array(content), {
+        headers: { 'Content-Type': sniffImageMimeType(content, mimeTypeForPreviewExtension(extension)) },
+      });
+    }
     return net.fetch(pathToFileURL(resolvedPath).href);
   };
 
@@ -3832,6 +3839,14 @@ function previewKindForExtension(extension: string, isLocal: boolean): string {
 function mimeTypeForPreviewExtension(extension: string): string {
   const ext = String(extension || '').trim().toLowerCase();
   return guessAttachmentMimeType(ext, previewKindForExtension(ext, true));
+}
+
+function sniffImageMimeType(content: Buffer, fallback: string): string {
+  if (content.length >= 12 && content.toString('ascii', 0, 4) === 'RIFF' && content.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  if (content.length >= 8 && content.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (content.length >= 3 && content[0] === 0xff && content[1] === 0xd8 && content[2] === 0xff) return 'image/jpeg';
+  if (content.length >= 6 && /^GIF8[79]a$/.test(content.toString('ascii', 0, 6))) return 'image/gif';
+  return fallback;
 }
 
 async function readPreviewTextFile(filePath: string, extension: string): Promise<string | null> {
@@ -14618,6 +14633,7 @@ const LOCAL_BROWSER_CHANNELS = new Set([
   'subjects:categories:list',
   'knowledge:list-page',
   'knowledge:get-index-status',
+  'wander:list-history',
 ]);
 
 const LOCAL_BROWSER_ORIGINS = new Set([
@@ -14705,6 +14721,23 @@ function localBrowserMediaUrl(assetId: string): string {
   return `http://127.0.0.1:${HTTP_PORT}/api/local/media/${encodeURIComponent(assetId)}`;
 }
 
+function localBrowserKnowledgeAssetUrl(source: unknown): string {
+  const raw = String(source || '').trim();
+  if (!raw) return '';
+  let absolutePath = '';
+  try {
+    absolutePath = resolveAssetSourceToPath(raw);
+  } catch {
+    return raw;
+  }
+  const root = path.resolve(getKnowledgeRedbookDir());
+  const relativePath = path.relative(root, path.resolve(absolutePath));
+  if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) return raw;
+  const [entryId, ...assetParts] = relativePath.split(path.sep).filter(Boolean);
+  if (!entryId || assetParts.length === 0) return raw;
+  return `http://127.0.0.1:${HTTP_PORT}/api/local/knowledge/${encodeURIComponent(entryId)}/asset/${assetParts.map(encodeURIComponent).join('/')}`;
+}
+
 function exposeSubjectToLocalBrowser(subject: Awaited<ReturnType<typeof getSubject>>) {
   const imageUrls = (subject.absoluteImagePaths || []).map((_, index) => (
     `http://127.0.0.1:${HTTP_PORT}/api/local/subjects/${encodeURIComponent(subject.id)}/image/${index}`
@@ -14782,6 +14815,26 @@ async function invokeLocalBrowserDataChannel(channel: string, rawPayload: unknow
           isBuilding: pendingCount > 0,
           lastError: null,
         };
+      }
+      case 'wander:list-history': {
+        const { listWanderHistory } = await import('./db');
+        return listWanderHistory({ includeAbandoned: Boolean(payload.includeAbandoned) }).map((record) => {
+          let items: unknown[] = [];
+          try {
+            const parsed = typeof record.items === 'string' ? JSON.parse(record.items) : record.items;
+            items = Array.isArray(parsed) ? parsed : [];
+          } catch {
+            items = [];
+          }
+          return {
+            ...record,
+            items: items.map((item) => {
+              if (!item || typeof item !== 'object') return item;
+              const entry = item as Record<string, unknown>;
+              return { ...entry, cover: localBrowserKnowledgeAssetUrl(entry.cover) };
+            }),
+          };
+        });
       }
     }
   } catch (error) {
@@ -15289,6 +15342,9 @@ function startHttpServer() {
           contentType = mimeTypeForPreviewExtension(path.extname(filePath).slice(1));
         }
         const content = await fs.readFile(filePath);
+        if (previewKindForExtension(path.extname(filePath).slice(1), true) === 'image') {
+          contentType = sniffImageMimeType(content, contentType);
+        }
         res.writeHead(200, {
           'Content-Type': contentType,
           'Content-Length': content.length,
