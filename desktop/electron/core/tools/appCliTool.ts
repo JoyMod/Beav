@@ -64,6 +64,13 @@ import {
     getAbsoluteMediaPath,
 } from '../mediaLibraryStore';
 import {
+    cloneVoice,
+    deleteVoice,
+    getVoice,
+    listVoices,
+    synthesizeVoiceSpeech,
+} from '../mediaGenerationJobRegistry';
+import {
     addAssetToVideoProjectPack,
     addGeneratedAssetToVideoProjectPack,
     createVideoProjectPack,
@@ -501,6 +508,11 @@ const APP_CLI_NAMESPACE_HELP: Record<string, { summary: string; actions: string[
             'video generate --prompt "从清晨空房间过渡到夜晚亮灯房间" --mode first-last-frame --reference-images "/abs/first.png,/abs/last.png"',
             'video generate --prompt "让这段镜头继续向前推进" --mode continuation --first-clip "/abs/clip.mp4"',
         ],
+    },
+    voice: {
+        summary: 'List, inspect, clone, synthesize, and delete voices.',
+        actions: ['list', 'get', 'clone', 'speech', 'delete'],
+        examples: ['voice list', 'voice speech', 'voice clone'],
     },
     'video-edit': {
         summary: 'Drive the V2 subtitle-based automatic video editor: assets, SRT/ASR, auto edit, Remotion render.',
@@ -1183,7 +1195,7 @@ export class AppCliTool extends DeclarativeTool<typeof AppCliParamsSchema> {
             });
 
             if (parsed.namespace === 'help') {
-                const topic = parsed.action && parsed.action !== 'show'
+                const topic = parsed.action && parsed.action !== 'show' && parsed.action !== 'list'
                     ? parsed.action
                     : (typeof readFlag(parsed.flags, 'namespace', 'topic') === 'string'
                         ? String(readFlag(parsed.flags, 'namespace', 'topic'))
@@ -1356,6 +1368,12 @@ export class AppCliTool extends DeclarativeTool<typeof AppCliParamsSchema> {
                     },
                 };
             }
+            if (result && typeof result === 'object' && (result as Record<string, unknown>).success === false) {
+                return createErrorResult(
+                    String((result as Record<string, unknown>).error || `${parsed.namespace} ${parsed.action} failed`),
+                    ToolErrorType.EXECUTION_FAILED,
+                );
+            }
             return createSuccessResult(toPrettyJson(result), `${parsed.namespace} ${parsed.action}`);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -1396,6 +1414,8 @@ export class AppCliTool extends DeclarativeTool<typeof AppCliParamsSchema> {
                 return this.handleImage(parsed, payload);
             case 'video':
                 return this.handleVideo(parsed, payload);
+            case 'voice':
+                return this.handleVoice(parsed, payload);
             case 'video-edit':
                 return this.handleVideoEdit(parsed, payload);
             case 'mcp':
@@ -1411,6 +1431,16 @@ export class AppCliTool extends DeclarativeTool<typeof AppCliParamsSchema> {
             default:
                 throw new Error(`Unknown namespace: ${parsed.namespace}`);
         }
+    }
+
+    private async handleVoice(parsed: ParsedCommand, payload: Record<string, unknown>) {
+        const input = { ...parsed.flags, ...payload };
+        if (parsed.action === 'list') return listVoices(input);
+        if (parsed.action === 'get') return getVoice(input);
+        if (parsed.action === 'clone') return cloneVoice(input);
+        if (parsed.action === 'speech') return synthesizeVoiceSpeech(input);
+        if (parsed.action === 'delete') return deleteVoice(input);
+        throw new Error(`Unsupported voice action: ${parsed.action}`);
     }
 
     private async handleSpaces(parsed: ParsedCommand, _payload: Record<string, unknown>) {

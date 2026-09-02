@@ -91,6 +91,20 @@ interface SessionMetadata {
   compactRounds?: number;
   compactUpdatedAt?: string;
   workItemId?: string;
+  activeSkills?: string[];
+  requiredSkill?: string | string[];
+  allowedTools?: string[];
+  allowedAppCliActions?: string[];
+  requireSave?: boolean;
+  requireSkillInvocations?: string[];
+  forbiddenFinalPhrases?: string[];
+}
+
+interface RuntimeToolOutcome {
+  toolName: string;
+  result: ToolResult;
+  command?: string;
+  args?: Record<string, unknown>;
 }
 
 interface AgentTextContent {
@@ -345,7 +359,9 @@ export class PiChatService {
     const activated: Array<{ name: string; description: string }> = [];
     for (const skillName of normalized) {
       const skill = this.skillManager.getSkill(skillName);
-      if (!skill || skill.disabled) continue;
+      if (!skill || skill.disabled) {
+        throw new Error(`必需技能“${skillName}”未安装或已禁用，任务已停止，未产生稿件。`);
+      }
       const wasActive = this.skillManager.isSkillActive(skill.name);
       const content = await this.skillManager.activateSkill(skill.name);
       if (!content || wasActive) continue;
@@ -667,6 +683,7 @@ export class PiChatService {
     sessionId: string,
     modelOverride?: ChatModelOverrideConfig,
     attachmentRuntime?: ChatAttachmentRuntimeOptions,
+    runtimeHints?: Record<string, unknown>,
   ) {
     this.sessionId = sessionId;
     this.abortController = new AbortController();
@@ -684,6 +701,7 @@ export class PiChatService {
         allowInteractiveOnboarding: true,
         emitSkillActivation: true,
         modelOverride,
+        runtimeHints,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -771,12 +789,14 @@ export class PiChatService {
       this.emitDebugLog('info', 'agent:run:start');
       const generatedImages: GeneratedImagePreview[] = [];
       const generatedVideos: GeneratedVideoPreview[] = [];
+      const runtimeToolOutcomes: RuntimeToolOutcome[] = [];
       const runtime = new QueryRuntime(
         this.toolRegistry,
         this.toolExecutor,
         {
           onEvent: (event) => this.handleQueryRuntimeEvent(event, generatedImages, generatedVideos),
-          onToolResult: (toolName, result, command) => {
+          onToolResult: (toolName, result, command, args) => {
+            runtimeToolOutcomes.push({ toolName, result, command, args });
             this.maybeRegisterArtifactFromRuntimeToolResult(toolName, result, command);
           },
           summarizeToolResult: (_toolName, result) => {
@@ -805,7 +825,8 @@ export class PiChatService {
           toolPack: 'redclaw',
           toolNames: preparedExecution.route.intent === 'direct_answer'
             ? (requiresNativeSearch ? ['provider_search'] : [])
-            : undefined,
+            : metadata.allowedTools,
+          allowedAppCliActions: metadata.allowedAppCliActions,
           runtimeMode,
           interactive: true,
           requiresHumanApproval: preparedExecution.route.requiresHumanApproval,
@@ -828,6 +849,10 @@ export class PiChatService {
       if (generatedVideos.length > 0) {
         fullResponse = this.appendGeneratedVideosMarkdown(fullResponse, generatedVideos);
       }
+      const contractError = this.validateRuntimeContract(metadata, fullResponse, runtimeToolOutcomes);
+      if (contractError) {
+        throw new Error(contractError);
+      }
       if (fullResponse) {
         this.emitDebugLog('info', 'sendMessage:full-response', {
           streamedChunks: true,
@@ -840,16 +865,6 @@ export class PiChatService {
           session_id: sessionId,
           role: 'assistant',
           content: fullResponse,
-        });
-      } else {
-        console.warn('[PiChatService] Empty assistant response', {
-          sessionId,
-          streamedChunks: true,
-          historyCount: history.length,
-        });
-        this.emitDebugLog('warn', 'sendMessage:empty-response', {
-          streamedChunks: true,
-          historyCount: history.length,
         });
       }
 
@@ -990,15 +1005,19 @@ export class PiChatService {
     allowInteractiveOnboarding: boolean;
     emitSkillActivation: boolean;
     modelOverride?: ChatModelOverrideConfig;
+    runtimeHints?: Record<string, unknown>;
   }): Promise<PreparePiRuntimeOutcome> {
-    const { content, sessionId, allowInteractiveOnboarding, emitSkillActivation, modelOverride } = params;
+    const { content, sessionId, allowInteractiveOnboarding, emitSkillActivation, modelOverride, runtimeHints } = params;
     const settings = (getSettings() || {}) as Record<string, unknown>;
     const apiKey = String(modelOverride?.apiKey || (settings.api_key as string) || (settings.openaiApiKey as string) || process.env.OPENAI_API_KEY || '').trim();
     const baseURL = normalizeApiBaseUrl(
       String(modelOverride?.baseURL || (settings.api_endpoint as string) || (settings.openaiApiBase as string) || 'https://api.openai.com/v1'),
       'https://api.openai.com/v1',
     );
-    let metadata = this.getSessionMetadata(sessionId);
+    let metadata: SessionMetadata = {
+      ...this.getSessionMetadata(sessionId),
+      ...(runtimeHints || {}),
+    };
     const modelScope = resolveModelScopeFromContextType(String(metadata.contextType || ''));
     const modelName = String(modelOverride?.modelName || resolveScopedModelName(settings, modelScope, (settings.openaiModel as string) || 'gpt-4o')).trim();
     const runtimeMode = this.resolveRuntimeMode(metadata);
@@ -1020,6 +1039,14 @@ export class PiChatService {
       await this.ensureSkillsDiscovered(workspace);
     } catch (error) {
       console.warn('[PiChatService] Failed to load skills:', error);
+    }
+
+    const requiredSkills = Array.from(new Set([
+      ...this.toStringList(metadata.activeSkills),
+      ...this.toStringList(metadata.requiredSkill),
+    ]));
+    if (requiredSkills.length > 0) {
+      await this.activateSkills(requiredSkills);
     }
 
     try {
@@ -2971,13 +2998,10 @@ export class PiChatService {
     const userPath = path.join(profileRoot, 'user.md');
     const creatorProfilePath = path.join(profileRoot, 'CreatorProfile.md');
     const subjectsPath = path.join(workspacePaths.base, 'subjects');
-    const appCliPath = path.join(process.cwd(), 'archive', 'desktop-electron', 'electron', 'core', 'tools', 'appCliTool.ts');
-    const promptsLibraryPath = path.join(process.cwd(), 'archive', 'desktop-electron', 'electron', 'prompts', 'library');
 
     return [
-      `- Main documentation: app_cli tool usage (${appCliPath})`,
-      `- Additional docs: prompt library (${promptsLibraryPath})`,
-      '- Discovery-first: use `app_cli(command="help")` or `app_cli(command="help <namespace>")` before niche commands',
+      '- App business operations: use `app_cli(command="help")` or `app_cli(command="help <namespace>")`; do not search the source tree for tool documentation.',
+      '- The prompt library is already injected by the runtime; do not search for prompt files on disk.',
       `- Memory document: ${memoryPath}`,
       `- Agent document: ${agentPath}`,
       `- Soul document: ${soulPath}`,
@@ -2986,6 +3010,44 @@ export class PiChatService {
       `- Creator strategy document: ${creatorProfilePath}`,
       `- Subjects library root: ${subjectsPath}`,
     ].join('\n');
+  }
+
+  private toStringList(value: unknown): string[] {
+    const values = Array.isArray(value) ? value : [value];
+    return values.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+
+  private validateRuntimeContract(
+    metadata: SessionMetadata,
+    response: string,
+    outcomes: RuntimeToolOutcome[],
+  ): string | null {
+    if (!response.trim()) {
+      return '模型未返回可读内容，任务未完成。';
+    }
+
+    for (const skillName of this.toStringList(metadata.requireSkillInvocations)) {
+      const invoked = outcomes.some((outcome) => outcome.toolName === 'skill'
+        && outcome.result.success
+        && String(outcome.args?.skill || outcome.args?.name || '').trim() === skillName);
+      if (!invoked) {
+        return `创作任务未成功调用必需技能“${skillName}”，任务未完成且未标记成功。`;
+      }
+    }
+
+    if (metadata.requireSave) {
+      const saved = outcomes.some((outcome) => outcome.toolName === 'app_cli'
+        && outcome.result.success
+        && (String((outcome.result.data as Record<string, unknown> | undefined)?.kind || '') === 'manuscript-write'
+          || /^manuscripts\s+(write|create)\b/.test(String(outcome.command || '').trim())));
+      if (!saved) {
+        return '创作任务没有收到真实的稿件保存成功结果，任务未完成且未标记成功。';
+      }
+    }
+
+    const forbidden = this.toStringList(metadata.forbiddenFinalPhrases)
+      .find((phrase) => response.includes(phrase));
+    return forbidden ? `最终回复包含禁止的来源痕迹“${forbidden}”，任务未完成。` : null;
   }
 
   private buildProjectContextSection(workspacePaths: ReturnType<typeof getWorkspacePaths>): string {

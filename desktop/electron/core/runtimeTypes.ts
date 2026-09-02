@@ -66,6 +66,7 @@ export interface RuntimeConfig {
   reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
   toolPack: string;
   toolNames?: string[];
+  allowedAppCliActions?: string[];
   runtimeMode?: string;
   interactive?: boolean;
   requiresHumanApproval?: boolean;
@@ -73,7 +74,7 @@ export interface RuntimeConfig {
 
 export interface RuntimeAdapter {
   onEvent: (event: RuntimeEvent) => void;
-  onToolResult?: (toolName: string, result: ToolResult, command?: string) => void;
+  onToolResult?: (toolName: string, result: ToolResult, command?: string, args?: Record<string, unknown>) => void;
   summarizeToolResult?: (toolName: string, result: ToolResult) => string | null;
 }
 

@@ -1,6 +1,6 @@
 # Image Generate Prompt Contract
 
-Use this before writing final prompts for `Operate(resource="image", operation="generate", input={ ... })`.
+Use this before writing final prompts for `app_cli(command="image generate", payload={ ... })`.
 
 ## Prompt Structure
 

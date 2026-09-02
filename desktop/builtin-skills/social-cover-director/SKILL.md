@@ -2,10 +2,10 @@
 name: social-cover-director
 description: 'Use when the user wants to plan or generate a social media cover image for a Xiaohongshu note, Douyin/TikTok photo post, Reels/Shorts cover, WeChat/Video Account post, Bilibili/Weibo post, Pinterest pin, Instagram cover, Facebook/Meta social post, or similar creator/social content. Handles platform-native cover routing, aspect ratio, scroll-stopping hook, exact on-image copy, reference-image roles, and image.generate prompt construction for one cover or a small variant set.'
 allowedRuntimeModes: [chatroom, redclaw, image-generation]
-allowedTools: [workflow]
+allowedTools: [app_cli, skill]
 activationScope: turn
 autoActivate: false
-activationHint: '当用户要做小红书封面、笔记封面、社媒封面、视频封面、图文首图、Reels/TikTok/Shorts 封面、朋友圈/视频号/微博/B站/Instagram/Pinterest 等内容封面时，调用 `Operate(resource="skills", operation="invoke", input={ "name": "social-cover-director" })`。这是单张封面或少量封面变体技能；成套卡片、轮播图、商品详情图继续优先用 image-director。'
+activationHint: '当用户要做小红书封面、笔记封面、社媒封面、视频封面、图文首图、Reels/TikTok/Shorts 封面、朋友圈/视频号/微博/B站/Instagram/Pinterest 等内容封面时，调用 `skill({ "skill": "social-cover-director" })`。这是单张封面或少量封面变体技能；成套卡片、轮播图、商品详情图继续优先用 image-director。'
 contextNote: 'social-cover-director 只负责社交媒体内容封面的点击钩子、封面文案、画面策略和生成提示词。不要把它扩成整套图文卡片规划；不要把封面制作降级成普通配图或商品白底图。'
 hookMode: inline
 ---
@@ -87,7 +87,7 @@ These references are bundled with this skill and may be used directly:
    - optional badge/label
    - optional short proof/CTA
 8. In normal chat/redclaw flow, show the Phase 1 plan and wait for confirmation before generation.
-9. After confirmation, call `Operate(resource="image", operation="generate", input={ ... })`.
+9. After confirmation, call `app_cli(command="image generate", payload={ ... })`.
 10. After generation, run QA and flag rerun candidates.
 
 ## Phase 1 Output

@@ -7142,6 +7142,7 @@ ipcMain.on('chat:send-message', async (event, {
       {
         userInputContent: attachmentRuntimeInput || undefined,
       },
+      taskHints && typeof taskHints === 'object' ? taskHints as Record<string, unknown> : undefined,
     );
     console.log('[chat:send-message] completed', { sessionId });
 
@@ -14624,7 +14625,6 @@ let httpServer: http.Server | null = null;
 
 const LOCAL_BROWSER_CHANNELS = new Set([
   'db:get-settings',
-  'db:save-settings',
   'spaces:list',
   'media:list',
   'subjects:list',

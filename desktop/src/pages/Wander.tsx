@@ -5,7 +5,7 @@ import { WanderLoadingDice } from '../components/wander/WanderLoadingDice';
 import { resolveAssetUrl } from '../utils/pathManager';
 import type { PendingChatMessage } from '../features/app-shell/types';
 import {
-  AUTHORING_ALLOWED_OPERATE_ACTIONS,
+  AUTHORING_ALLOWED_APP_CLI_ACTIONS,
   AUTHORING_ALLOWED_TOOLS,
   buildTaskBriefPromptSection,
 } from '../utils/redclawAuthoring';
@@ -796,15 +796,15 @@ export function Wander({ isActive = true, onExecutionStateChange, onTitleBarCont
       '站位：这是围绕该选题重新写一篇新的独立内容，不是为“评论区洞察”写说明，也不是复盘素材来源。',
       '选题中心素材只是后台参考数据来源，只能用来校准事实、需求、场景、痛点和表达方向；正文中禁止出现“原文”“原笔记”“评论区”“评论里”“有用户评论”“大家在评论区问”等来源痕迹。',
       '如果参考素材来自评论洞察，也必须把它转化为独立内容里的读者问题、场景或判断，不要把读者带回素材现场。',
-      '可按需读取下方素材目录或用户档案；素材目录不是正文文件，如需读取，请优先 Read “建议读取”里的具体文件，或先 List 目录再 Read 具体文件。',
+      '下方已提供参考素材；用户与创作者档案会由运行时注入，不要到源码目录里搜索。',
       '本任务必须按五个连续阶段完成，不能跳过，也不能把前一阶段的技能输出当成后一阶段的完整上下文。',
-      '开始执行后，先输出一句简短、自然的过程说明，让用户知道你会先初始化工作 brief 并核对是否需要外部调研；不要输出计划列表或整篇正文。',
-      '阶段一：调研判断。随后调用 `taskBrief.update` 初始化工作 brief；然后判断这个选题是否涉及当下事实、产品、平台规则、价格、政策、人物、案例、数据或其它容易过期的信息；涉及就必须调用 `Operate(resource="web", operation="search", input={ "query": "<搜索词>" })` 做搜索，并把可用事实、来源和不确定点写回 Task Brief。若不需要外部调研，也要把“不需要外部调研”的判断和理由写回 Task Brief。',
-      '阶段二：文章打法定向。根据选题、调研事实和读者真实好奇心，先判断 `articleStrategy`，再调用 `taskBrief.update` 写入：articleStyle、readerQuestion、corePromise、titleDirection、openingDirection、structureDirection、avoidDirection。这个阶段要先回答“读者看到这个选题，脑子里最直接的问题是什么”，并判断标题和正文应该走直接疑问、反常识、数据冲击、故事化、观点型还是其它打法。',
-      '阶段三：标题。必须显式调用一次 `Operate(resource="skills", operation="invoke", input={ "name": "xhs-title" })`，让日志可审计；标题必须服从 `articleStrategy`，不要自由套公式。生成至少 4 个分风格候选标题，至少包含“直接疑问”和“悬念表达”两类，并把完整 titleCandidates、selectedTitle、selectedTitleReason 写回 Task Brief。最终选择时优先贴近 readerQuestion；除非悬念标题明显更强，否则商业解释型/反常识型内容优先直接疑问。',
-      '阶段四：正文。拿阶段三选出的最终标题作为正文唯一标题，然后必须显式调用一次 `Operate(resource="skills", operation="invoke", input={ "name": "writing-style" })`，让日志可审计；正文阶段由 `writing-style` 主导，但必须同时服从 `articleStrategy`：开头兑现 openingDirection，结构服从 structureDirection，信息密度和语气服从 articleStyle。',
+      '开始执行后，先输出一句简短、自然的过程说明；不要输出计划列表或整篇正文。',
+      '阶段一：调研判断。判断选题是否涉及易过期事实；涉及时调用 `provider_search`，不涉及时直接说明判断理由。',
+      '阶段二：文章打法定向。根据选题、调研事实和读者真实好奇心确定 articleStrategy：articleStyle、readerQuestion、corePromise、titleDirection、openingDirection、structureDirection、avoidDirection。',
+      '阶段三：标题。必须显式调用一次 `skill({ "skill": "xhs-title" })`；生成至少 4 个分风格候选标题并选择最终标题。',
+      '阶段四：正文。必须显式调用一次 `skill({ "skill": "writing-style" })`；正文由该技能主导并服从 articleStrategy。',
       '阶段五：保存。创建稿件工程并保存最终文案。',
-      '如果 `writing-style` 要求读取用户档案或创作者档案，正文动笔前必须先读取；不要因为已经完成标题阶段，就省略写作风格上下文。创建稿件工程后，后续 `Write` 的 content 仍然必须是按 `writing-style` 自检后的完整正文。',
+      '如果 `writing-style` 要求读取用户档案或创作者档案，正文动笔前必须先读取；不要因为已经完成标题阶段，就省略写作风格上下文。',
       '完稿前按 `articleStrategy` 和 `writing-style` 双重自检标题、开头、结构、事实边界、语气和禁区；内容质量优先于素材覆盖率。正文不要写成报告式大纲，不要输出孤立分隔线，不要只模仿素材格式。',
       '',
       '## 灵感选题',
@@ -822,8 +822,8 @@ export function Wander({ isActive = true, onExecutionStateChange, onTitleBarCont
       '3. 再显式调用 `xhs-title` 完成标题阶段，内部选择 1 个最终标题；必须把完整候选标题、评分和选择理由写入 Task Brief；最终稿件和最终回复都只保留最终标题。',
       '4. 再显式调用 `writing-style` 完成正文阶段；正文必须按该技能规则和 `articleStrategy` 写作、自检，不能只沿用标题阶段的上下文。',
       '5. 正文必须是一篇独立小红书内容，禁止提到参考来源来自原笔记或评论区。',
-      '6. 如目标工程不存在，先调用 `Operate(resource="manuscripts", operation="createProject", input={ "kind": "post", "parent": "wander", "title": "<最终标题>" })` 创建 post 文件夹稿件工程。',
-      '7. 完成后调用 `Write(path="manuscripts://current", content="<最终标题和按 articleStrategy + writing-style 自检后的完整正文>")` 保存；保存成功后的最终回复只给运行总结和稿件链接，不要重复全文。',
+      '6. 完成后调用 `app_cli(command="manuscripts write --path \\"wander/<简短文件名>.md\\"", payload={ "content": "<最终标题和完整正文>" })` 保存，并等待真实成功结果。',
+      '7. 保存成功后的最终回复只给运行总结和稿件路径，不要重复全文。',
     ].join('\n');
 
     onNavigateToRedClaw({
@@ -837,13 +837,11 @@ export function Wander({ isActive = true, onExecutionStateChange, onTitleBarCont
         writeTarget: 'manuscripts://current',
         requiredSkill: ['writing-style', 'xhs-title'],
         activeSkills: ['writing-style', 'xhs-title'],
-        allowedTools: [...AUTHORING_ALLOWED_TOOLS, 'web'],
-        allowedOperateActions: [...AUTHORING_ALLOWED_OPERATE_ACTIONS, 'web.search'],
-        allowedWriteTargets: ['manuscripts://current'],
+        allowedTools: AUTHORING_ALLOWED_TOOLS,
+        allowedAppCliActions: AUTHORING_ALLOWED_APP_CLI_ACTIONS,
         requireSourceRead: false,
         requireProfileRead: false,
         requireSave: true,
-        requireTaskBrief: true,
         requireSkillInvocations: ['xhs-title', 'writing-style'],
         taskBrief,
         forbiddenFinalPhrases: ['原文', '原笔记', '评论区', '评论里', '有用户评论', '大家在评论区问'],

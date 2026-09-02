@@ -26,14 +26,20 @@ function copyBuiltinSkills() {
   return {
     name: 'copy-builtin-skills',
     closeBundle: () => {
-      const srcDir = path.resolve(__dirname, 'electron/builtin-skills')
       const destDir = path.resolve(__dirname, 'dist-electron/builtin-skills')
+      const sourceDirs = [
+        path.resolve(__dirname, 'builtin-skills'),
+        path.resolve(__dirname, 'electron/builtin-skills'),
+      ]
 
-      if (fs.existsSync(srcDir)) {
-        fs.cpSync(srcDir, destDir, { recursive: true })
-        console.log(`[copy-builtin-skills] Copied builtin skills from ${srcDir} to ${destDir}`)
-      } else {
-        console.warn(`[copy-builtin-skills] Source directory not found: ${srcDir}`)
+      fs.rmSync(destDir, { recursive: true, force: true })
+      for (const srcDir of sourceDirs) {
+        if (fs.existsSync(srcDir)) {
+          fs.cpSync(srcDir, destDir, { recursive: true })
+          console.log(`[copy-builtin-skills] Copied builtin skills from ${srcDir} to ${destDir}`)
+        } else {
+          console.warn(`[copy-builtin-skills] Source directory not found: ${srcDir}`)
+        }
       }
     }
   }

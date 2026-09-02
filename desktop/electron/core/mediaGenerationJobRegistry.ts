@@ -884,7 +884,7 @@ export class MediaGenerationJobRegistry extends EventEmitter {
   }
 }
 
-async function cloneVoice(request: Record<string, unknown>): Promise<Record<string, unknown>> {
+export async function cloneVoice(request: Record<string, unknown>): Promise<Record<string, unknown>> {
   const settings = readSettings();
   const endpoint = normalizeApiBaseUrl(endpointFromRequest(request, settings));
   const apiKey = apiKeyFromRequest(request, settings);

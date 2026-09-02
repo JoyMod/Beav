@@ -2,14 +2,14 @@
 name: video-director
 description: 'Canonical entrypoint for every AI chat request that asks to make, generate, plan, or edit a video, including promotional films, ads, short videos, product videos, reference-image videos, image-to-video, first/last-frame transitions, storyboard/keyframes, character talking-head videos, 宣传片, 广告片, 短视频, 视频, 口播视频, 分镜图, 图片转视频, and 商品宣传片. Do not invoke cosyvoice-ssml or tts-director as the first response to a video request. This skill must draft a script and shot table, generate storyboard contact-sheet preview images through image.generate, ask the user to confirm the script plus storyboard together, and only then call video generation.'
 allowedRuntimeModes: [chatroom, redclaw]
-allowedTools: [workflow]
+allowedTools: [app_cli, skill]
 activationScope: session
 activationHint: 'Invoke this before any media generation when the user asks for 宣传片, 广告片, 短片, 短视频, 视频, 口播视频, 数字人视频, 分镜, 分镜图, 图片转视频, reference-image video, product promotional video, character talking-head video, or an attached/reference image to become a video. In AI chat, all video-generation requests must enter this skill first. Do not call cosyvoice-ssml, tts-director, image.generate, voice.speech, or video.generate first; load this skill and follow its staged workflow.'
 ---
 
 # Video Director
 
-Use this skill before calling `Operate(resource="video", operation="generate", input={ ... })` for video work.
+Use this skill before calling `app_cli(command="video generate", payload={ ... })` for video work.
 
 For AI chat, this skill is the single entrypoint for video generation. If the user says "做一个口播视频", "生成一个视频", "产品宣传片", "广告片", "数字人视频", or any similar video request, invoke `video-director` first. Do not start from `cosyvoice-ssml`; that skill is an internal digital-human TTS substep and must not drive the video workflow.
 
@@ -20,11 +20,11 @@ If this skill was loaded because the user attached an image and asked for a prom
 Treat the workflow as a gated state machine. Do not skip or reorder states:
 
 1. `plan_draft`: Clarify the intended video mode from the user's goal and assets, then draft a concise but detailed video script and shot table.
-2. `storyboard_preview`: Immediately after the shot table exists, generate storyboard contact-sheet preview image(s) with `Operate(resource="image", operation="generate", input={ ... })`. The storyboard image is a preview of the planned shots, not a standalone product poster, replacement product render, cover image, or final video keyframe.
+2. `storyboard_preview`: Immediately after the shot table exists, generate storyboard contact-sheet preview image(s) with `app_cli(command="image generate", payload={ ... })`. The storyboard image is a preview of the planned shots, not a standalone product poster, replacement product render, cover image, or final video keyframe.
 3. `user_review`: Show the script, storyboard preview image(s), and explicit video specs together. Ask the user to confirm or revise the whole plan.
 4. `production_prep`: After confirmation, decide whether this should be a `<=15s` single upstream clip, a long `video_sequence` request, or a manual editor/project assembly. Only use a video project pack if the user explicitly asks for a project/package/editor workflow, or the task is already bound to an existing pack.
 5. `tts_if_needed`: If the confirmed task is a character talking-head / 口播 video, complete the TTS-first workflow below.
-6. `video_generate`: Only after confirmation and any required TTS audio is complete, call `Operate(resource="video", operation="generate", input={ ... })`.
+6. `video_generate`: Only after confirmation and any required TTS audio is complete, call `app_cli(command="video generate", payload={ ... })`.
 
 If the user has not yet confirmed the script, do not generate the video.
 
@@ -60,12 +60,12 @@ Use this exact order:
 2. **Resolve the character voice**
    - Read the selected character asset before generating media.
    - If the asset has a ready `voiceId` / `voice_id`, treat that as the resolved voice and stop inspecting voice samples. Report the resolved `voiceId`, not the reference-audio filename.
-   - If the asset has a voice sample but no ready `voiceId`, call `Operate(resource="voice", operation="clone", input={ ... })` first, wait for completion, and use the returned `voiceId`.
+   - If the asset has a voice sample but no ready `voiceId`, call `app_cli(command="voice clone", payload={ ... })` first, wait for completion, and use the returned `voiceId`.
    - If there is no ready `voiceId` and no usable voice sample, stop and ask the user to provide or choose a voice. Do not fall back to a generic voice silently.
 3. **Generate the complete voice track with TTS**
-   - Call `Operate(resource="voice", operation="speech", input={ ... })` with the full approved spoken script and the resolved `voiceId`.
+   - Call `app_cli(command="voice speech", payload={ ... })` with the full approved spoken script and the resolved `voiceId`.
    - Prefer one complete audio asset for the whole talking-head segment unless the user explicitly wants separate clips.
-   - For expressive narration, long scripts, poetry, ads, or any multi-emotion performance inside this confirmed digital-human / VideoRetalk flow, activate `tts-director` first with `Operate(resource="skills", operation="invoke", input={ "name": "tts-director" })`, then use its guidance to split the approved script into semantic beats and assign model-appropriate delivery controls.
+   - For expressive narration, long scripts, poetry, ads, or any multi-emotion performance inside this confirmed digital-human / VideoRetalk flow, activate `tts-director` first with `skill({ "skill": "tts-director" })`, then use its guidance to split the approved script into semantic beats and assign model-appropriate delivery controls.
    - If the selected TTS model is CosyVoice, `tts-director` may activate `cosyvoice-ssml` only here, after the video-director workflow has confirmed this is a digital-human / VideoRetalk / asset-library talking-head video and the script plus role voice are resolved.
    - Add restrained delivery controls when they improve the approved performance: use `speed` for pace, `pitch` for tone, `emotion` for mood, expressive punctuation such as `～`, `？`, `！`, `……`, and MiniMax text markers such as `<#0.6#>`, `(laughs)`, `(sighs)`, or `(breath)` inside `input` only where the spoken rhythm needs them.
    - Do not write control instructions into the spoken text. For example, pass `"emotion":"happy"` and `speed:1.08` instead of making the character say “用开心快速的语气”.
@@ -76,7 +76,7 @@ Use this exact order:
    - Use the selected character image as the visual reference.
    - Use the newly generated complete TTS audio asset as `drivingAudio`.
    - Identify it in the prompt preface as generated speech audio, for example `Audio 1: generated Jamba TTS speech for lip-sync / speaking rhythm`.
-   - Then call `Operate(resource="video", operation="generate", input={ ... })`, normally in `reference-guided` mode.
+   - Then call `app_cli(command="video generate", payload={ ... })`, normally in `reference-guided` mode.
 
 This is mandatory because the video model needs a finished audio waveform aligned with the approved script. A character `voiceId` is not audio. A voice sample is not the approved spoken line. The spoken text inside the video prompt is not a substitute for TTS.
 
@@ -145,7 +145,7 @@ Do not create one only because the request has multiple shots, long context, con
 
 When it is explicitly needed, create it with:
 
-- `Operate(resource="video", operation="create", input={ "explicitProjectWorkflow": true, "title": "...", "duration": "...", "aspectRatio": "...", "mode": "..." })`
+- `app_cli(command="video project-create", payload={ "title": "...", "duration": "...", "aspectRatio": "...", "mode": "..." })`
 
 The project folder lives in:
 
@@ -278,7 +278,7 @@ Rules:
 
 Reference handling is mandatory:
 
-- Before any `image.generate` or `video.generate` call that depends on prior context, inspect the Current session resources block. If the needed file is not obvious there, call `Operate(resource="session", operation="list", input={ "kind": "image", "limit": 20 })` or `Operate(action="session.resources.list", payload={...})` and use the returned `reference` / `path` value exactly.
+- Before any `image generate` or `video generate` call that depends on prior context, inspect the Current session resources block. If the needed file is not obvious there, call `app_cli(command="media list --limit 20")` and use the returned asset path exactly.
 - If the user attached or selected product images, character images, brand images, scene references, or previous generated images, pass them to `image.generate` as `referenceImages`.
 - If the reference comes from the asset library, read the asset first and pass its resolved image path(s) through `referenceImages` or `subjectIds`.
 - If several references exist, include prompt preface lines that define each role, such as `Image 1: product shape and material reference`, `Image 2: character identity reference`, `Image 3: scene mood reference`.
@@ -441,19 +441,19 @@ For chat/agent video creation, set `waitForCompletion: true` unless the user exp
 
 ## Tool Usage
 
-- Always use `Operate(resource="video", operation="generate", input={ ... })`.
+- Always use `app_cli(command="video generate", payload={ ... })`.
 - For asset-library character 口播 videos, resolve the voice before the video tool:
   - If the character has a ready `voiceId`, use it directly for TTS and do not inspect or summarize reference audio unless troubleshooting voice binding.
-  - If the character has only a voice sample, call `Operate(resource="voice", operation="clone", input={ ... })`, wait for completion, and use the returned `voiceId`.
+  - If the character has only a voice sample, call `app_cli(command="voice clone", payload={ ... })`, wait for completion, and use the returned `voiceId`.
   - If no voice can be resolved, ask for a voice instead of generating a silent or generic-voice video.
-- After resolving the voice, call `Operate(resource="voice", operation="speech", input={ ... })` before the video tool:
+- After resolving the voice, call `app_cli(command="voice speech", payload={ ... })` before the video tool:
   - `input`: the full approved spoken script
   - `voiceId`: the selected character asset's stored voice id
   - `speed`: optional speech speed, 0.5-2.0; use subtle defaults such as 0.95 for steady narration or 1.05-1.12 for energetic口播
   - `pitch`: optional pitch, -12 to 12; keep 0 unless the character or user intent calls for a higher/lower tone
   - `emotion`: optional MiniMax emotion: `happy`, `sad`, `angry`, `fearful`, `disgusted`, `surprised`, `calm`, `fluent`, `whipser`/`whisper`
   - MiniMax text controls: use expressive punctuation such as `～`, `？`, `！`, `……`, `？！`, `！！` for tone, `<#0.6#>` for intentional pauses, and `(laughs)`, `(sighs)`, `(breath)`, `(chuckle)` for light expression when useful
-  - Before building expressive or multi-beat TTS payloads, activate `tts-director` with `Operate(resource="skills", operation="invoke", input={ "name": "tts-director" })`
+  - Before building expressive or multi-beat TTS payloads, activate `tts-director` with `skill({ "skill": "tts-director" })`
   - `segments`: use this for one long voice track with multiple emotional beats; submit once and let the media runtime merge the final audio
   - `title`: a clear audio asset title
   - `projectId` / `boundManuscriptPath`: include them when known

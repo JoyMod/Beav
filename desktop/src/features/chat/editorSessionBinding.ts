@@ -50,8 +50,8 @@ type BuildEditorSessionBindingParams = {
   editorBodyDirty: boolean;
 };
 
-const WRITING_EDITOR_ALLOWED_TOOLS = ['workflow'];
-const WRITING_EDITOR_ALLOWED_APP_CLI_ACTIONS = ['manuscripts.writeCurrent'];
+const WRITING_EDITOR_ALLOWED_TOOLS = ['app_cli', 'skill'];
+const WRITING_EDITOR_ALLOWED_APP_CLI_ACTIONS = ['manuscripts.read', 'manuscripts.write'];
 
 function text(value: unknown): string {
   return String(value || '').trim();

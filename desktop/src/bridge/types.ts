@@ -19,7 +19,7 @@ export type BridgeCore = {
   on: (channel: string, listener: Listener) => void;
   off: (channel: string, listener: Listener) => void;
   removeAllListeners: (channel: string) => void;
-  sendChannel: (channel: string, payload?: unknown) => void;
+  sendChannel: (channel: string, payload?: unknown) => boolean;
   invokeChannel: (channel: string, payload?: unknown) => Promise<any>;
   invokeChannelGuarded: <T = unknown>(
     channel: string,

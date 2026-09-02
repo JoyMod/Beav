@@ -405,6 +405,15 @@ interface StructuredChatErrorNotice {
   };
 }
 
+function isLocalBrowserPreview(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hasElectronTransport = Boolean(
+    (window as typeof window & { __RED_ELECTRON_IPC__?: unknown }).__RED_ELECTRON_IPC__,
+  );
+  return !hasElectronTransport
+    && ['http://localhost:5173', 'http://127.0.0.1:5173'].includes(window.location.origin);
+}
+
 const CHAT_ERROR_NOTICE_AUTO_DISMISS_MS = 6500;
 const CHAT_ERROR_NOTICE_ACTION_AUTO_DISMISS_MS = 15000;
 
@@ -2099,7 +2108,41 @@ export function Chat({
         sessionId: payload.sessionId || null,
         chars: payload.message.length,
       });
-      window.ipcRenderer.chat.send(payload);
+      const accepted = window.ipcRenderer.chat.send(payload);
+      if (!accepted) {
+        const errorPayload: ChatErrorEventPayload = {
+          title: '浏览器预览为只读模式',
+          message: '本地浏览器仅用于查看页面，不能执行 AI 对话或写入操作。',
+          hint: '请在竹叶自媒体平台桌面 App 中继续。',
+          errorCode: 'LOCAL_BROWSER_READ_ONLY',
+          category: 'critical',
+          retryable: false,
+          transportMode: 'browser-preview',
+        };
+        const notice = normalizeChatErrorNotice(errorPayload);
+        const errorTimelineItem = buildChatErrorTimelineItem(errorPayload, notice);
+        setIsProcessing(false);
+        setErrorNotice(notice);
+        setMessages((prev) => {
+          const lastReplyIndex = findLastAssistantReplyIndex(prev);
+          if (lastReplyIndex < 0) return prev;
+          const next = [...prev];
+          const lastMessage = next[lastReplyIndex];
+          next[lastReplyIndex] = {
+            ...lastMessage,
+            isStreaming: false,
+            suppressPendingIndicator: true,
+            processingFinishedAt: Date.now(),
+            timeline: [
+              ...(lastMessage.timeline || []).map((item) => item.status === 'running'
+                ? { ...item, status: 'failed' as const, duration: Date.now() - item.timestamp }
+                : item),
+              errorTimelineItem,
+            ],
+          };
+          return next;
+        });
+      }
     });
   }, [debugUi]);
 
@@ -4137,6 +4180,18 @@ export function Chat({
       setErrorNotice(attachmentBlockReason);
       return;
     }
+    if (isLocalBrowserPreview()) {
+      setErrorNotice(normalizeChatErrorNotice({
+        title: '浏览器预览为只读模式',
+        message: '本地浏览器仅用于查看页面，不能执行 AI 对话或写入操作。',
+        hint: '请在竹叶自媒体平台桌面 App 中继续。',
+        errorCode: 'LOCAL_BROWSER_READ_ONLY',
+        category: 'critical',
+        retryable: false,
+        transportMode: 'browser-preview',
+      }));
+      return;
+    }
     responseCompletedRef.current = false;
     const runtimeMessage = normalizedContent || displayBody || displayText || (hasAttachments ? '请分析这些附件。' : '');
     const assetReferencesForSend = assetMentions.map((item) => ({
@@ -4196,6 +4251,7 @@ export function Chat({
         targetSessionId = null;
       }
       if (!targetSessionId) {
+        setIsProcessing(false);
         setErrorNotice('创建对话失败，请稍后重试');
         return;
       }
@@ -4506,6 +4562,22 @@ export function Chat({
         onDeny={handleDenyCliEscalation}
       />
       <ToolConfirmDialog request={confirmRequest} onConfirm={handleConfirmTool} onCancel={handleCancelTool} />
+      {source === 'empty' && errorNotice && (() => {
+        const structuredNotice = typeof errorNotice === 'string' ? null : errorNotice;
+        const noticeTitle = structuredNotice?.title || '请求失败';
+        const noticeBody = structuredNotice?.hint || (typeof errorNotice === 'string' ? errorNotice : '');
+        return (
+          <div role="alert" className="mb-3 flex items-center gap-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.08] px-3 py-2 text-left text-amber-800 dark:text-amber-200">
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-medium">{noticeTitle}</div>
+              {noticeBody && <div className="mt-0.5 text-[11px] opacity-80">{noticeBody}</div>}
+            </div>
+            <button type="button" onClick={() => setErrorNotice(null)} className="shrink-0 rounded-md px-2 py-1 text-[11px] hover:bg-amber-500/10">
+              关闭
+            </button>
+          </div>
+        );
+      })()}
       <ChatComposer
         ref={composerRef}
         theme={composerTheme}

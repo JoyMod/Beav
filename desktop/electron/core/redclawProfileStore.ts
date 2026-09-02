@@ -638,10 +638,27 @@ export async function completeRedClawStyleDefinition(payload: Record<string, unk
   await ensureRedClawProfileFiles();
   const creatorProfile = String(payload.creatorProfile || payload.creatorProfileMarkdown || '').trim();
   const soul = String(payload.soul || payload.soulMarkdown || '').trim();
+  const user = String(payload.user || payload.userMarkdown || '').trim();
+  const writingStyleSkill = String(payload.writingStyleSkillMarkdown || '').trim();
   if (creatorProfile) await updateRedClawProfileDocument('creator_profile', creatorProfile);
   if (soul) await updateRedClawProfileDocument('soul', soul);
+  if (user) await updateRedClawProfileDocument('user', user);
+  if (writingStyleSkill) {
+    if (!writingStyleSkill.startsWith('---') || !writingStyleSkill.includes('# Writing Style')) {
+      throw new Error('writingStyleSkillMarkdown must include frontmatter and a # Writing Style heading');
+    }
+    const skillDir = path.join(getWorkspacePaths().skills, 'writing-style');
+    await fs.mkdir(skillDir, { recursive: true });
+    await fs.writeFile(path.join(skillDir, 'SKILL.md'), writingStyleSkill, 'utf-8');
+  }
   if (payload.answers && typeof payload.answers === 'object') {
     await completeRedClawInitialization(payload.answers as Record<string, unknown>);
+  } else {
+    const state = await loadOnboardingState();
+    state.askedFirstQuestion = true;
+    state.stepIndex = ONBOARDING_STEPS.length;
+    state.completedAt = nowIso();
+    await saveOnboardingState(state);
   }
   return loadRedClawProfilePromptBundle();
 }

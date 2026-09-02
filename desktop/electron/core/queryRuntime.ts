@@ -763,6 +763,26 @@ export class QueryRuntime {
       };
     }
 
+    const allowedToolNames = this.config.toolNames;
+    if (allowedToolNames && !allowedToolNames.includes(toolCall.name)) {
+      return this.rejectDisallowedToolCall(toolCall, `Tool "${toolCall.name}" is not allowed for this task`, startedAt);
+    }
+
+    if (toolCall.name === 'app_cli' && this.config.allowedAppCliActions?.length) {
+      const command = this.extractCommand(toolCall.args);
+      const [namespace = '', action = ''] = command.trim().split(/\s+/);
+      const canonicalAction = namespace === 'help'
+        ? `help.${action ? 'show' : 'list'}`
+        : `${namespace}.${action}`;
+      if (!this.config.allowedAppCliActions.includes(canonicalAction)) {
+        return this.rejectDisallowedToolCall(
+          toolCall,
+          `app_cli action "${canonicalAction}" is not allowed for this task`,
+          startedAt,
+        );
+      }
+    }
+
     const permission = evaluateRuntimeToolPermission({
       tool,
       toolName: toolCall.name,
@@ -847,7 +867,7 @@ export class QueryRuntime {
           },
         },
       });
-      this.adapter.onToolResult?.(toolCall.name, deniedResult, this.extractCommand(toolCall.args));
+      this.adapter.onToolResult?.(toolCall.name, deniedResult, this.extractCommand(toolCall.args), toolCall.args);
       return {
         callId: toolCall.id,
         name: toolCall.name,
@@ -912,6 +932,7 @@ export class QueryRuntime {
       summaryText: summarized,
       payload: {
         durationMs: response.durationMs,
+        args: toolCall.args,
       },
     });
     if (summarized) {
@@ -930,7 +951,7 @@ export class QueryRuntime {
       durationMs: response.durationMs,
     });
 
-    this.adapter.onToolResult?.(toolCall.name, response.result, this.extractCommand(toolCall.args));
+    this.adapter.onToolResult?.(toolCall.name, response.result, this.extractCommand(toolCall.args), toolCall.args);
     this.store.appendTranscript({
       sessionId: this.config.sessionId,
       recordType: 'tool.result',
@@ -1135,5 +1156,23 @@ export class QueryRuntime {
       }
       return [header, ...nodeLines];
     });
+  }
+
+  private rejectDisallowedToolCall(toolCall: LlmToolCall, message: string, startedAt: number): ToolCallResponse {
+    const result = createErrorResult(message, ToolErrorType.PERMISSION_DENIED);
+    this.adapter.onEvent({
+      type: 'tool_end',
+      callId: toolCall.id,
+      name: toolCall.name,
+      result,
+      durationMs: now() - startedAt,
+    });
+    this.adapter.onToolResult?.(toolCall.name, result, this.extractCommand(toolCall.args), toolCall.args);
+    return {
+      callId: toolCall.id,
+      name: toolCall.name,
+      result,
+      durationMs: now() - startedAt,
+    };
   }
 }

@@ -2,10 +2,10 @@
 name: tts-director
 description: Use when generating expressive TTS, short-video voiceover, self-media narration, product explanation, ads, livestream clips, character speech, podcast-style voiceover, or any speech request that needs tone, speed, pitch, rhythm, pauses, or multi-segment delivery. For ordinary chat/audio work this skill is the TTS entrypoint. CosyVoice SSML is not a general entrypoint: only activate `cosyvoice-ssml` inside a video-director managed digital-human / VideoRetalk / asset-library talking-head video flow. MiniMax uses ordered segments with emotion controls. Do not call TTS repeatedly or hand-merge audio.
 allowedRuntimeModes: [chatroom, redclaw, image-generation]
-allowedTools: [workflow]
+allowedTools: [app_cli, skill]
 activationScope: turn
 autoActivate: false
-activationHint: 当用户要生成短视频口播、自媒体口播、带货口播、产品讲解、种草测评、直播切片、朗读、有节奏的 TTS，或明确要求语气/情绪/语速/停顿时，可调用 `Operate(resource="skills", operation="invoke", input={ "name": "tts-director" })`。如果用户要的是视频或口播视频，必须先调用 `video-director`，不要用本技能直接接管视频任务。只有在 `video-director` 已确认这是数字人 / VideoRetalk / 资产库角色 talking-head 视频，并进入 TTS 子步骤时，CosyVoice 分支才允许激活 `cosyvoice-ssml`；普通聊天、普通音频和普通视频请求不得激活 `cosyvoice-ssml`。
+activationHint: 当用户要生成短视频口播、自媒体口播、带货口播、产品讲解、种草测评、直播切片、朗读、有节奏的 TTS，或明确要求语气/情绪/语速/停顿时，可调用 `skill({ "skill": "tts-director" })`。如果用户要的是视频或口播视频，必须先调用 `video-director`，不要用本技能直接接管视频任务。只有在 `video-director` 已确认这是数字人 / VideoRetalk / 资产库角色 talking-head 视频，并进入 TTS 子步骤时，CosyVoice 分支才允许激活 `cosyvoice-ssml`；普通聊天、普通音频和普通视频请求不得激活 `cosyvoice-ssml`。
 contextNote: 这是 TTS 表演设计技能。它不负责重写文章主题，不负责视频画面设计；它只把已确认或可直接朗读的文本转成有节奏、有情绪层次、可执行的模型专用 TTS payload。视频任务入口始终是 `video-director`。`cosyvoice-ssml` 只属于数字人 / VideoRetalk / 资产库角色口播视频的内部 TTS 子流程；MiniMax 不使用 prompt/SSML。
 maxPromptChars: 18000
 hookMode: inline
@@ -13,7 +13,7 @@ hookMode: inline
 
 # TTS Director
 
-Use this skill before calling `Operate(resource="voice", operation="speech", input={ ... })` when the speech should sound performed rather than flat.
+Use this skill before calling `app_cli(command="voice speech", payload={ ... })` when the speech should sound performed rather than flat.
 
 ## Core Mission
 
@@ -41,7 +41,7 @@ This distinction is mandatory because the models support different controls:
 - MiniMax supports `emotion`, `speed`, `pitch`, MiniMax pause markers, and `segments`. It does not support CosyVoice `prompt`.
 - The `segments` array is a media-runtime sequence feature, not a MiniMax-only capability. MiniMax uses it for emotion/speed/pitch segment controls. CosyVoice SSML segments are reserved for the digital-human / VideoRetalk flow.
 
-If the selected model is CosyVoice and the task is not a `video-director` digital-human / VideoRetalk TTS substep, do not invoke `cosyvoice-ssml`. Keep the TTS payload conservative, or ask the user to move into the数字人 workflow if they need a character talking-head video. If the selected model is CosyVoice inside the approved digital-human flow, invoke `cosyvoice-ssml` once before building the final request. `skills.invoke` only activates instructions; it does not return SSML.
+If the selected model is CosyVoice and the task is not a `video-director` digital-human / VideoRetalk TTS substep, do not invoke `cosyvoice-ssml`. Keep the TTS payload conservative, or ask the user to move into the数字人 workflow if they need a character talking-head video. If the selected model is CosyVoice inside the approved digital-human flow, invoke `cosyvoice-ssml` once before building the final request. `skill({ "skill": "cosyvoice-ssml" })` only activates instructions; it does not return SSML.
 
 If the selected model is MiniMax, do not output SSML or `prompt`. Use the existing `segments` workflow.
 
@@ -67,13 +67,7 @@ Choose the payload shape from the selected TTS model.
 
 For `cosyvoice-v3.5-plus`, activate `cosyvoice-ssml` before constructing SSML only when this TTS request is part of a `video-director` managed digital-human / VideoRetalk / asset-library talking-head video:
 
-```json
-{
-  "resource": "skills",
-  "operation": "invoke",
-  "input": { "name": "cosyvoice-ssml" }
-}
-```
+`skill({ "skill": "cosyvoice-ssml" })`
 
 Then submit the single `voice.speech` request you build from the activated skill rules. Use one request only; for long text, put multiple items in `segments` and let the media runtime merge them.
 

@@ -16,7 +16,7 @@ export { CalculatorTool } from './calculatorTool';
 export { ListDirTool } from './listDirTool'; // Legacy list
 export { ExploreWorkspaceTool } from './exploreWorkspaceTool';
 export { SaveMemoryTool } from './memoryTool';
-export { RedClawUpdateProfileDocTool, RedClawUpdateCreatorProfileTool } from './creatorProfileTool';
+export { RedClawCompleteStyleDefinitionTool, RedClawUpdateProfileDocTool, RedClawUpdateCreatorProfileTool } from './creatorProfileTool';
 export {
     RedClawCreateProjectTool,
     RedClawSaveCopyPackTool,
@@ -41,6 +41,7 @@ import { BashTool } from './bashTool';
 import { AppCliTool } from './appCliTool';
 import { WorkspaceTool } from './workspaceTool';
 import { ProviderNativeSearchTool } from './providerNativeSearchTool';
+import { RedClawCompleteStyleDefinitionTool, RedClawUpdateCreatorProfileTool, RedClawUpdateProfileDocTool } from './creatorProfileTool';
 import {
     createBuiltinToolInstances,
     type BuiltinToolPack,
@@ -134,6 +135,48 @@ const ensureBuiltinToolDescriptorsRegistered = (): void => {
         visibility: 'public',
         requiresContext: null,
         create: ({ skillManager, onSkillActivated }) => (skillManager ? new SkillTool(skillManager, onSkillActivated) : null),
+    });
+    register({
+        name: 'redclaw_update_profile_doc',
+        displayName: '更新长期档案',
+        description: 'Update a RedClaw long-term profile document after the user confirms durable profile information.',
+        kind: ToolKind.Edit,
+        contexts: ['redclaw'],
+        visibility: 'public',
+        requiresContext: null,
+        successSignal: 'profile document updated',
+        failureSignal: 'profile document update failed',
+        artifactOutput: ['profile'],
+        retryPolicy: 'manual',
+        create: () => new RedClawUpdateProfileDocTool(),
+    });
+    register({
+        name: 'redclaw_update_creator_profile',
+        displayName: '更新创作者档案',
+        description: 'Update CreatorProfile.md after the user confirms durable creator positioning and style.',
+        kind: ToolKind.Edit,
+        contexts: ['redclaw'],
+        visibility: 'public',
+        requiresContext: null,
+        successSignal: 'creator profile updated',
+        failureSignal: 'creator profile update failed',
+        artifactOutput: ['profile'],
+        retryPolicy: 'manual',
+        create: () => new RedClawUpdateCreatorProfileTool(),
+    });
+    register({
+        name: 'redclaw_complete_style_definition',
+        displayName: '完成风格定义',
+        description: 'Persist the confirmed RedClaw profile and writing-style skill, then complete onboarding.',
+        kind: ToolKind.Edit,
+        contexts: ['redclaw'],
+        visibility: 'public',
+        requiresContext: null,
+        successSignal: 'style definition persisted',
+        failureSignal: 'style definition persistence failed',
+        artifactOutput: ['profile', 'skill'],
+        retryPolicy: 'manual',
+        create: () => new RedClawCompleteStyleDefinitionTool(),
     });
     register({
         name: 'calculator',

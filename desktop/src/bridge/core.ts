@@ -80,6 +80,22 @@ function getElectronTransport(): ElectronIpcTransport | null {
   return null;
 }
 
+function registerLocalListener(channel: string, listener: Listener): void {
+  if (!channelListeners.has(channel)) {
+    channelListeners.set(channel, new Map());
+  }
+  channelListeners.get(channel)!.set(listener, {});
+}
+
+function emitLocalEvent(channel: string, payload: unknown): void {
+  const listeners = channelListeners.get(channel);
+  if (!listeners) return;
+  for (const [listener, record] of listeners.entries()) {
+    if (record.disposed) continue;
+    listener({ __electron: false, channel }, payload);
+  }
+}
+
 async function invokeChannel(channel: string, payload?: unknown): Promise<any> {
   try {
     const transport = getElectronTransport();
@@ -93,13 +109,37 @@ async function invokeChannel(channel: string, payload?: unknown): Promise<any> {
   }
 }
 
-function sendChannel(channel: string, payload?: unknown): void {
+function sendChannel(channel: string, payload?: unknown): boolean {
   const transport = getElectronTransport();
   if (!transport) {
     console.warn(`[竹叶自媒体平台] send skipped for ${channel}: Electron IPC transport is unavailable`);
-    return;
+    if (isLocalBrowserRuntime() && channel === 'chat:send-message') {
+      const data = payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? payload as Record<string, unknown>
+        : {};
+      window.queueMicrotask(() => {
+        emitLocalEvent('runtime:event', {
+          eventType: 'runtime:checkpoint',
+          sessionId: String(data.sessionId || ''),
+          payload: {
+            checkpointType: 'chat.error',
+            payload: {
+              title: '浏览器预览为只读模式',
+              message: '本地浏览器仅用于查看页面，不能执行 AI 对话或写入操作。',
+              hint: '请在竹叶自媒体平台桌面 App 中继续。',
+              errorCode: 'LOCAL_BROWSER_READ_ONLY',
+              category: 'critical',
+              retryable: false,
+              transportMode: 'browser-preview',
+            },
+          },
+        });
+      });
+    }
+    return false;
   }
   transport.send(channel, payload ?? null);
+  return true;
 }
 
 async function invokeCommand<T = unknown>(command: string, args?: unknown): Promise<T> {
@@ -206,6 +246,10 @@ async function invokeCommandGuarded<T = unknown>(
 function on(channel: string, listener: Listener): void {
   const transport = getElectronTransport();
   if (!transport) {
+    if (isLocalBrowserRuntime()) {
+      registerLocalListener(channel, listener);
+      return;
+    }
     console.warn(`[竹叶自媒体平台] listener skipped for ${channel}: Electron IPC transport is unavailable`);
     return;
   }

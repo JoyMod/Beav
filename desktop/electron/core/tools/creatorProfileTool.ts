@@ -6,7 +6,12 @@ import {
   createErrorResult,
   createSuccessResult,
 } from '../toolRegistry';
-import { updateRedClawCreatorProfile, updateRedClawProfileDocument, type RedClawProfileDocType } from '../redclawProfileStore';
+import {
+  completeRedClawStyleDefinition,
+  updateRedClawCreatorProfile,
+  updateRedClawProfileDocument,
+  type RedClawProfileDocType,
+} from '../redclawProfileStore';
 
 const UpdateProfileDocParamsSchema = z.object({
   docType: z.enum(['agent', 'soul', 'user', 'creator_profile']).describe('Which long-term RedClaw profile document to update.'),
@@ -22,6 +27,17 @@ const UpdateCreatorProfileParamsSchema = z.object({
 });
 
 type UpdateCreatorProfileParams = z.infer<typeof UpdateCreatorProfileParamsSchema>;
+
+const CompleteStyleDefinitionParamsSchema = z.object({
+  summary: z.string().min(1),
+  creatorProfileMarkdown: z.string().min(1),
+  soulMarkdown: z.string().min(1),
+  userMarkdown: z.string().min(1),
+  writingStyleSkillMarkdown: z.string().min(1),
+  answers: z.record(z.string(), z.unknown()).optional(),
+});
+
+type CompleteStyleDefinitionParams = z.infer<typeof CompleteStyleDefinitionParamsSchema>;
 
 const profileDocLabel = (docType: RedClawProfileDocType): string => {
   switch (docType) {
@@ -81,6 +97,28 @@ export class RedClawUpdateCreatorProfileTool extends DeclarativeTool<typeof Upda
       );
     } catch (error) {
       return createErrorResult(`Failed to update creator profile: ${String(error)}`);
+    }
+  }
+}
+
+export class RedClawCompleteStyleDefinitionTool extends DeclarativeTool<typeof CompleteStyleDefinitionParamsSchema> {
+  readonly name = 'redclaw_complete_style_definition';
+  readonly displayName = '完成风格定义';
+  readonly description = 'Persist the user-confirmed RedClaw profile and workspace writing-style skill, then mark onboarding complete.';
+  readonly kind = ToolKind.Edit;
+  readonly parameterSchema = CompleteStyleDefinitionParamsSchema;
+  readonly requiresConfirmation = false;
+
+  getDescription(): string {
+    return '保存已确认的创作者定位与写作风格';
+  }
+
+  async execute(params: CompleteStyleDefinitionParams): Promise<ToolResult> {
+    try {
+      await completeRedClawStyleDefinition(params);
+      return createSuccessResult(params.summary, '风格定义已保存');
+    } catch (error) {
+      return createErrorResult(`Failed to complete style definition: ${String(error)}`);
     }
   }
 }

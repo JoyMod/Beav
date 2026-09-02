@@ -4,9 +4,9 @@ Use this map when deciding what the user would do.
 
 ## Profiles
 
-- `profiles://user`: user-level identity, operating style, and persistent preferences.
-- `profiles://creator_profile`: current creator/account positioning, audience, content goals, and expression boundaries.
-- `Operate(resource="redclaw.profile", operation="bundle", input={})`: app-provided profile bundle when available.
+- Runtime-injected user profile: user-level identity, operating style, and persistent preferences.
+- Runtime-injected creator profile: current creator/account positioning, audience, content goals, and expression boundaries.
+- Runtime-injected RedClaw profile bundle when available.
 
 ## RedClaw
 

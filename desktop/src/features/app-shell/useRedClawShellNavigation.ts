@@ -45,12 +45,7 @@ export function useRedClawShellNavigation({
         taskHints: {
           activeSkills: ['redclaw-style-definition'],
           requiredSkill: 'redclaw-style-definition',
-          allowedOperateActions: [
-            'redclaw.profile.bundle',
-            'redclaw.profile.read',
-            'redclaw.profile.update',
-            'redclaw.profile.completeStyleDefinition',
-          ],
+          allowedTools: ['skill', 'redclaw_complete_style_definition'],
           initialContext: '用户从界面入口手动请求重新定义当前 RedClaw 空间风格。',
         } as AuthoringTaskHints,
       });

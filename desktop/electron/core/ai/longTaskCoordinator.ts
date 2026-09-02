@@ -344,8 +344,9 @@ const isReviewerApproved = (review: SubagentOutput): boolean => {
   return true;
 };
 
-const hasSuccessfulManuscriptWrite = (sessionId: string): boolean => {
-  const toolResults = getSessionRuntimeStore().listToolResults(sessionId, 20);
+const hasSuccessfulManuscriptWrite = (sessionId: string, since: number): boolean => {
+  const toolResults = getSessionRuntimeStore().listToolResults(sessionId, 200)
+    .filter((result) => result.createdAt >= since);
   return [...toolResults].reverse().some((result) => {
     if (!result.success) return false;
     if (result.toolName !== 'app_cli') return false;
@@ -353,6 +354,25 @@ const hasSuccessfulManuscriptWrite = (sessionId: string): boolean => {
     const resultText = String(result.resultText || result.summaryText || result.promptText || '').toLowerCase();
     return command.startsWith('manuscripts write') || resultText.includes('manuscript saved successfully');
   });
+};
+
+const findMissingRequiredSkill = (task: AgentTaskSnapshot, sessionId: string, since: number): string | null => {
+  const metadata = task.metadata && typeof task.metadata === 'object'
+    ? task.metadata as Record<string, unknown>
+    : {};
+  const rawRequired = metadata.requireSkillInvocations;
+  const required = (Array.isArray(rawRequired) ? rawRequired : [rawRequired])
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  if (required.length === 0) return null;
+  const results = getSessionRuntimeStore().listToolResults(sessionId, 200)
+    .filter((result) => result.createdAt >= since && result.success && result.toolName === 'skill');
+  return required.find((skillName) => !results.some((result) => {
+    const args = result.payload?.args && typeof result.payload.args === 'object'
+      ? result.payload.args as Record<string, unknown>
+      : {};
+    return String(args.skill || args.name || '').trim() === skillName;
+  })) || null;
 };
 
 const buildSaveRepairPrompt = (): string => [
@@ -666,6 +686,7 @@ export class LongTaskCoordinator {
     const route = task.route;
 
     const sessionId = this.ensureOwnerSession(task);
+    const executionStartedAt = Date.now();
     await backgroundRegistry.attachSession(backgroundTaskId, sessionId);
     emitCoordinatorPhase('协调器已接管', options);
     options.emitChatEvent?.('chat:thought-start', {});
@@ -860,8 +881,21 @@ export class LongTaskCoordinator {
       content: execution.response,
     });
 
+    const missingRequiredSkill = findMissingRequiredSkill(task, sessionId, executionStartedAt);
+    if (missingRequiredSkill) {
+      const skillError = `coordinator execution missing required skill invocation: ${missingRequiredSkill}`;
+      runtime.failTask(task.id, skillError, 'execute_tools');
+      await backgroundRegistry.failTask(backgroundTaskId, skillError);
+      throw buildCoordinatorError({
+        message: '执行校验未通过',
+        raw: skillError,
+        hint: `本轮没有真实调用必需技能“${missingRequiredSkill}”，结果未标记成功。`,
+        category: 'validation',
+      });
+    }
+
     let repairResponse = '';
-    if (task.intent === 'manuscript_creation' && !hasSuccessfulManuscriptWrite(sessionId)) {
+    if (task.intent === 'manuscript_creation' && !hasSuccessfulManuscriptWrite(sessionId, executionStartedAt)) {
       emitCoordinatorPhase('补保存稿件', options);
       emitCoordinatorThought('检测到稿件尚未真实落盘，正在执行强制保存步骤...', options);
       runtime.addTrace(task.id, 'coordinator.save_repair.started', {
@@ -934,7 +968,7 @@ You are in a repair-only pass. The manuscript must be saved for real before you 
       });
       runtime.addTrace(task.id, 'coordinator.save_repair.completed', {
         responseLength: repair.response.length,
-        hasSavedManuscript: hasSuccessfulManuscriptWrite(sessionId),
+        hasSavedManuscript: hasSuccessfulManuscriptWrite(sessionId, executionStartedAt),
       }, 'save_artifact');
     }
 
@@ -985,7 +1019,7 @@ You are in a repair-only pass. The manuscript must be saved for real before you 
       runtime.completeNode(task.id, 'review', reviewOutput.summary);
     }
 
-    if (task.intent === 'manuscript_creation' && !hasSuccessfulManuscriptWrite(sessionId)) {
+    if (task.intent === 'manuscript_creation' && !hasSuccessfulManuscriptWrite(sessionId, executionStartedAt)) {
       const saveError = 'coordinator execution missing successful manuscripts write tool result';
       runtime.failTask(task.id, saveError, 'save_artifact');
       await backgroundRegistry.failTask(backgroundTaskId, saveError);
