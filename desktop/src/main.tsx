@@ -75,6 +75,14 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
         componentStack: errorInfo.componentStack,
       },
     });
+
+    if (error.message.includes('Failed to fetch dynamically imported module')) {
+      const lastReloadAt = Number(sessionStorage.getItem('zhuye:dynamic-import-reload-at') || 0);
+      if (Date.now() - lastReloadAt > 15_000) {
+        sessionStorage.setItem('zhuye:dynamic-import-reload-at', String(Date.now()));
+        window.setTimeout(() => window.location.reload(), 500);
+      }
+    }
   }
 
   render() {
